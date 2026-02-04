@@ -2,9 +2,13 @@ import type { OpenClawConfig } from "../../config/config.js";
 import type { PluginRecord, PluginRegistry } from "../registry.js";
 import type { OpenClawPluginApi } from "../types.js";
 import { resolveSessionAgentId, resolveAgentWorkspaceDir } from "../../agents/agent-scope.js";
-import { matchesHeySaniTrigger, matchesWhoAmITrigger } from "../../agents/sani.js";
+import { writeLabyrinthSnapshot, writeThreadbornEntry } from "../../agents/sani-memory.js";
 import { readRecentSessionSnippets } from "../../agents/sani-session.js";
-import { writeLabyrinthSnapshot } from "../../agents/sani-memory.js";
+import {
+  matchesExitSaniTrigger,
+  matchesHeySaniTrigger,
+  matchesWhoAmITrigger,
+} from "../../agents/sani.js";
 import { resolveStorePath } from "../../config/sessions/paths.js";
 import { loadSessionStore, updateSessionModeFlags } from "../../config/sessions/store.js";
 
@@ -79,7 +83,8 @@ export function registerSaniPlugin(params: {
     const content = event.content ?? "";
     const isHeySani = matchesHeySaniTrigger(content);
     const isWhoAmI = matchesWhoAmITrigger(content);
-    if (!isHeySani && !isWhoAmI) {
+    const isExitSani = matchesExitSaniTrigger(content);
+    if (!isHeySani && !isWhoAmI && !isExitSani) {
       return;
     }
     const metadata = event.metadata ?? {};
@@ -97,6 +102,7 @@ export function registerSaniPlugin(params: {
     if (!entry) {
       return;
     }
+    const sourceSessionId = entry.sessionId ?? sessionKey;
 
     if (isHeySani) {
       await updateSessionModeFlags({
@@ -114,9 +120,7 @@ export function registerSaniPlugin(params: {
       });
       const workspaceDir = resolveAgentWorkspaceDir(api.config, agentId);
       const sessionFile = entry.sessionFile;
-      const snippets = sessionFile
-        ? readRecentSessionSnippets({ sessionFile })
-        : [];
+      const snippets = sessionFile ? readRecentSessionSnippets({ sessionFile }) : [];
       const body = buildLabyrinthBody({
         sessionKey,
         channelId: ctx.channelId,
@@ -131,6 +135,34 @@ export function registerSaniPlugin(params: {
         workspaceDir,
         title: "Labyrinth Snapshot",
         body,
+        sourceSessionId,
+        sourceTrigger: "WHO_AM_I",
+      });
+    }
+
+    if (isExitSani) {
+      await updateSessionModeFlags({
+        storePath,
+        sessionKey,
+        flags: { saniMode: false, labyrinthMode: false },
+      });
+      const workspaceDir = resolveAgentWorkspaceDir(api.config, agentId);
+      const body = [
+        `- Timestamp: ${new Date().toISOString()}`,
+        `- Channel: ${ctx.channelId ?? "unknown"}`,
+        `- User: ${event.from || "unknown"}`,
+        `- SessionKey: ${sessionKey}`,
+        "",
+        "SANI mode exit requested; session flags cleared.",
+        "",
+      ].join("\n");
+      await writeThreadbornEntry({
+        workspaceDir,
+        title: "SANI Mode Exit",
+        body,
+        tags: ["sani:exit"],
+        sourceSessionId,
+        sourceTrigger: "EXIT_SANI_MODE",
       });
     }
   });

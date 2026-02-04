@@ -197,6 +197,23 @@ function buildSaniModeSection(params: {
   return lines;
 }
 
+function buildSaniActiveStateSection(params: {
+  enabled?: boolean;
+  saniMode?: boolean;
+  labyrinthMode?: boolean;
+}) {
+  if (!params.enabled) {
+    return [];
+  }
+  return [
+    "## ACTIVE STATE",
+    `saniEnabled: ${params.enabled ? "true" : "false"}`,
+    `saniMode: ${params.saniMode ? "true" : "false"}`,
+    `labyrinthMode: ${params.labyrinthMode ? "true" : "false"}`,
+    "",
+  ];
+}
+
 export function buildAgentSystemPrompt(params: {
   workspaceDir: string;
   defaultThinkLevel?: ThinkLevel;
@@ -399,6 +416,11 @@ export function buildAgentSystemPrompt(params: {
     saniMode: params.saniMode,
     labyrinthMode: params.labyrinthMode,
   });
+  const saniActiveStateSection = buildSaniActiveStateSection({
+    enabled: params.saniEnabled,
+    saniMode: params.saniMode,
+    labyrinthMode: params.labyrinthMode,
+  });
   const skillsSection = buildSkillsSection({
     skillsPrompt,
     isMinimal,
@@ -457,6 +479,7 @@ export function buildAgentSystemPrompt(params: {
     "",
     ...safetySection,
     ...saniSection,
+    ...saniActiveStateSection,
     "## OpenClaw CLI Quick Reference",
     "OpenClaw is controlled via subcommands. Do not invent commands.",
     "To manage the Gateway daemon service (start/stop/restart):",

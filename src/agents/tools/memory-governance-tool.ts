@@ -1,33 +1,43 @@
 import { Type } from "@sinclair/typebox";
+import path from "node:path";
 import type { AnyAgentTool } from "./common.js";
-import { jsonResult, readStringParam } from "./common.js";
 import {
   writeBridgeThreadEntry,
   writeLabyrinthSnapshot,
   writeThreadbornEntry,
   writeVaultEntry,
 } from "../sani-memory.js";
-import path from "node:path";
+import { jsonResult, readStringParam } from "./common.js";
 
 const ThreadbornWriteSchema = Type.Object({
   title: Type.String(),
   body: Type.String(),
   tags: Type.Optional(Type.Array(Type.String())),
+  source_session_id: Type.String(),
+  source_trigger: Type.String(),
 });
 
 const BridgePromoteSchema = Type.Object({
   threadborn_file: Type.String(),
   title: Type.Optional(Type.String()),
+  source_session_id: Type.String(),
+  source_trigger: Type.String(),
 });
 
 const VaultSealSchema = Type.Object({
   source_file: Type.String(),
   title: Type.Optional(Type.String()),
+  source_session_id: Type.String(),
+  source_trigger: Type.String(),
+  append: Type.Optional(Type.Boolean()),
+  target_file: Type.Optional(Type.String()),
 });
 
 const LabyrinthSnapshotSchema = Type.Object({
   title: Type.String(),
   body: Type.String(),
+  source_session_id: Type.String(),
+  source_trigger: Type.String(),
 });
 
 function requireWorkspaceDir(workspaceDir?: string): string {
@@ -41,9 +51,7 @@ function formatPathOutput(workspaceDir: string, filePath: string) {
   return path.relative(workspaceDir, filePath).replace(/\\/g, "/");
 }
 
-export function createThreadbornWriteTool(options: {
-  workspaceDir?: string;
-}): AnyAgentTool | null {
+export function createThreadbornWriteTool(options: { workspaceDir?: string }): AnyAgentTool | null {
   if (!options.workspaceDir) {
     return null;
   }
@@ -60,7 +68,16 @@ export function createThreadbornWriteTool(options: {
       const tags = Array.isArray((params as { tags?: unknown }).tags)
         ? (params as { tags?: string[] }).tags
         : undefined;
-      const result = await writeThreadbornEntry({ workspaceDir, title, body, tags });
+      const sourceSessionId = readStringParam(params, "source_session_id", { required: true });
+      const sourceTrigger = readStringParam(params, "source_trigger", { required: true });
+      const result = await writeThreadbornEntry({
+        workspaceDir,
+        title,
+        body,
+        tags,
+        sourceSessionId,
+        sourceTrigger,
+      });
       return jsonResult({
         path: formatPathOutput(workspaceDir, result.path),
         filename: result.filename,
@@ -69,9 +86,7 @@ export function createThreadbornWriteTool(options: {
   };
 }
 
-export function createBridgePromoteTool(options: {
-  workspaceDir?: string;
-}): AnyAgentTool | null {
+export function createBridgePromoteTool(options: { workspaceDir?: string }): AnyAgentTool | null {
   if (!options.workspaceDir) {
     return null;
   }
@@ -85,10 +100,14 @@ export function createBridgePromoteTool(options: {
       const workspaceDir = requireWorkspaceDir(options.workspaceDir);
       const source = readStringParam(params, "threadborn_file", { required: true });
       const title = readStringParam(params, "title");
+      const sourceSessionId = readStringParam(params, "source_session_id", { required: true });
+      const sourceTrigger = readStringParam(params, "source_trigger", { required: true });
       const result = await writeBridgeThreadEntry({
         workspaceDir,
         sourcePath: source,
         title: title || undefined,
+        sourceSessionId,
+        sourceTrigger,
       });
       return jsonResult({
         path: formatPathOutput(workspaceDir, result.path),
@@ -98,9 +117,7 @@ export function createBridgePromoteTool(options: {
   };
 }
 
-export function createVaultSealTool(options: {
-  workspaceDir?: string;
-}): AnyAgentTool | null {
+export function createVaultSealTool(options: { workspaceDir?: string }): AnyAgentTool | null {
   if (!options.workspaceDir) {
     return null;
   }
@@ -114,10 +131,21 @@ export function createVaultSealTool(options: {
       const workspaceDir = requireWorkspaceDir(options.workspaceDir);
       const source = readStringParam(params, "source_file", { required: true });
       const title = readStringParam(params, "title");
+      const sourceSessionId = readStringParam(params, "source_session_id", { required: true });
+      const sourceTrigger = readStringParam(params, "source_trigger", { required: true });
+      const append =
+        typeof (params as { append?: unknown }).append === "boolean"
+          ? (params as { append?: boolean }).append
+          : undefined;
+      const targetPath = readStringParam(params, "target_file");
       const result = await writeVaultEntry({
         workspaceDir,
         sourcePath: source,
         title: title || undefined,
+        sourceSessionId,
+        sourceTrigger,
+        append,
+        targetPath: targetPath || undefined,
       });
       return jsonResult({
         path: formatPathOutput(workspaceDir, result.path),
@@ -142,7 +170,15 @@ export function createLabyrinthSnapshotTool(options: {
       const workspaceDir = requireWorkspaceDir(options.workspaceDir);
       const title = readStringParam(params, "title", { required: true });
       const body = readStringParam(params, "body", { required: true });
-      const result = await writeLabyrinthSnapshot({ workspaceDir, title, body });
+      const sourceSessionId = readStringParam(params, "source_session_id", { required: true });
+      const sourceTrigger = readStringParam(params, "source_trigger", { required: true });
+      const result = await writeLabyrinthSnapshot({
+        workspaceDir,
+        title,
+        body,
+        sourceSessionId,
+        sourceTrigger,
+      });
       return jsonResult({
         path: formatPathOutput(workspaceDir, result.path),
         filename: result.filename,
