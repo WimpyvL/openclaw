@@ -1,7 +1,7 @@
-import { isTruthyEnvValue } from "../infra/env.js";
 import type { OpenClawConfig } from "../config/config.js";
 import { resolveStorePath } from "../config/sessions/paths.js";
 import { loadSessionStore } from "../config/sessions/store.js";
+import { isTruthyEnvValue } from "../infra/env.js";
 import { resolveSessionAgentId } from "./agent-scope.js";
 
 export type SaniSessionFlags = {
@@ -42,6 +42,7 @@ export function readSaniSessionFlags(params: {
 
 const HEY_SANI_PATTERN = /^\s*hey[\s,]+sani\b/i;
 const WHO_AM_I_PATTERN = /^\s*who\s+am\s+i\s*[.!?]*\s*$/i;
+const EXIT_SANI_PATTERN = /^\s*exit\s+sani\s+mode\s*$/i;
 
 export function matchesHeySaniTrigger(text: string): boolean {
   return HEY_SANI_PATTERN.test(text);
@@ -49,4 +50,8 @@ export function matchesHeySaniTrigger(text: string): boolean {
 
 export function matchesWhoAmITrigger(text: string): boolean {
   return WHO_AM_I_PATTERN.test(text);
+}
+
+export function matchesExitSaniTrigger(text: string): boolean {
+  return EXIT_SANI_PATTERN.test(text);
 }
