@@ -55,6 +55,10 @@ export type SessionEntry = {
   authProfileOverrideCompactionCount?: number;
   groupActivation?: "mention" | "always";
   groupActivationNeedsSystemIntro?: boolean;
+  /** Session flag: SANI mode enabled for this session. */
+  saniMode?: boolean;
+  /** Session flag: Labyrinth response mode enabled for this session. */
+  labyrinthMode?: boolean;
   sendPolicy?: "allow" | "deny";
   queueMode?:
     | "steer"

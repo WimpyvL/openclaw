@@ -26,6 +26,8 @@ import { createPluginRegistry, type PluginRecord, type PluginRegistry } from "./
 import { setActivePluginRegistry } from "./runtime.js";
 import { createPluginRuntime } from "./runtime/index.js";
 import { validateJsonSchemaValue } from "./schema-validator.js";
+import { resolveSaniEnabled } from "../agents/sani.js";
+import { registerSaniPlugin } from "./builtin/sani.js";
 
 export type PluginLoadResult = PluginRegistry;
 
@@ -193,6 +195,13 @@ export function loadOpenClawPlugins(options: PluginLoadOptions = {}): PluginRegi
     runtime,
     coreGatewayHandlers: options.coreGatewayHandlers as Record<string, GatewayRequestHandler>,
   });
+  if (resolveSaniEnabled(cfg)) {
+    registerSaniPlugin({
+      config: cfg,
+      registry,
+      createApi: (record, params) => createApi(record, params),
+    });
+  }
 
   const discovery = discoverOpenClawPlugins({
     workspaceDir: options.workspaceDir,

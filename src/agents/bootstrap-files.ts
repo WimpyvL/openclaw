@@ -2,6 +2,7 @@ import type { OpenClawConfig } from "../config/config.js";
 import type { EmbeddedContextFile } from "./pi-embedded-helpers.js";
 import { applyBootstrapHookOverrides } from "./bootstrap-hooks.js";
 import { buildBootstrapContextFiles, resolveBootstrapMaxChars } from "./pi-embedded-helpers.js";
+import { resolveSaniEnabled } from "./sani.js";
 import {
   filterBootstrapFilesForSession,
   loadWorkspaceBootstrapFiles,
@@ -29,7 +30,12 @@ export async function resolveBootstrapFilesForRun(params: {
   const bootstrapFiles = filterBootstrapFilesForSession(
     await loadWorkspaceBootstrapFiles(params.workspaceDir),
     sessionKey,
-  );
+  ).filter((file) => {
+    if (file.name !== "SANI.md") {
+      return true;
+    }
+    return resolveSaniEnabled(params.config);
+  });
   return applyBootstrapHookOverrides({
     files: bootstrapFiles,
     workspaceDir: params.workspaceDir,

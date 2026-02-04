@@ -48,6 +48,9 @@ export function buildEmbeddedSystemPrompt(params: {
   userTimeFormat?: ResolvedTimeFormat;
   contextFiles?: EmbeddedContextFile[];
   memoryCitationsMode?: MemoryCitationsMode;
+  saniEnabled?: boolean;
+  saniMode?: boolean;
+  labyrinthMode?: boolean;
 }): string {
   return buildAgentSystemPrompt({
     workspaceDir: params.workspaceDir,
@@ -74,6 +77,9 @@ export function buildEmbeddedSystemPrompt(params: {
     userTimeFormat: params.userTimeFormat,
     contextFiles: params.contextFiles,
     memoryCitationsMode: params.memoryCitationsMode,
+    saniEnabled: params.saniEnabled,
+    saniMode: params.saniMode,
+    labyrinthMode: params.labyrinthMode,
   });
 }
 

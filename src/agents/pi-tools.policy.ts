@@ -93,6 +93,10 @@ const DEFAULT_SUBAGENT_TOOL_DENY = [
   // Memory - pass relevant info in spawn prompt instead
   "memory_search",
   "memory_get",
+  "threadborn_write",
+  "bridge_promote",
+  "vault_seal",
+  "labyrinth_snapshot",
 ];
 
 export function resolveSubagentToolPolicy(cfg?: OpenClawConfig): SandboxToolPolicy {
