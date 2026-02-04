@@ -9,6 +9,12 @@ import { createCanvasTool } from "./tools/canvas-tool.js";
 import { createCronTool } from "./tools/cron-tool.js";
 import { createGatewayTool } from "./tools/gateway-tool.js";
 import { createImageTool } from "./tools/image-tool.js";
+import {
+  createBridgePromoteTool,
+  createLabyrinthSnapshotTool,
+  createThreadbornWriteTool,
+  createVaultSealTool,
+} from "./tools/memory-governance-tool.js";
 import { createMessageTool } from "./tools/message-tool.js";
 import { createNodesTool } from "./tools/nodes-tool.js";
 import { createSessionStatusTool } from "./tools/session-status-tool.js";
@@ -143,6 +149,14 @@ export function createOpenClawTools(options?: {
       agentSessionKey: options?.agentSessionKey,
       config: options?.config,
     }),
+    ...(options?.workspaceDir
+      ? [
+          createThreadbornWriteTool({ workspaceDir: options.workspaceDir }),
+          createBridgePromoteTool({ workspaceDir: options.workspaceDir }),
+          createVaultSealTool({ workspaceDir: options.workspaceDir }),
+          createLabyrinthSnapshotTool({ workspaceDir: options.workspaceDir }),
+        ].filter((tool): tool is AnyAgentTool => Boolean(tool))
+      : []),
     ...(webSearchTool ? [webSearchTool] : []),
     ...(webFetchTool ? [webFetchTool] : []),
     ...(imageTool ? [imageTool] : []),

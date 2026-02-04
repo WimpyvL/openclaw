@@ -134,6 +134,12 @@ export const AgentDefaultsSchema = z
       ])
       .optional(),
     heartbeat: HeartbeatSchema,
+    sani: z
+      .object({
+        enabled: z.boolean().optional(),
+      })
+      .strict()
+      .optional(),
     maxConcurrent: z.number().int().positive().optional(),
     subagents: z
       .object({

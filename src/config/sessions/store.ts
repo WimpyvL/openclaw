@@ -377,6 +377,22 @@ export async function updateSessionStoreEntry(params: {
   });
 }
 
+export async function updateSessionModeFlags(params: {
+  storePath: string;
+  sessionKey: string;
+  flags: { saniMode?: boolean; labyrinthMode?: boolean };
+}): Promise<SessionEntry | null> {
+  const { storePath, sessionKey, flags } = params;
+  return await updateSessionStoreEntry({
+    storePath,
+    sessionKey,
+    update: async () => ({
+      saniMode: flags.saniMode,
+      labyrinthMode: flags.labyrinthMode,
+    }),
+  });
+}
+
 export async function recordSessionMetaFromInbound(params: {
   storePath: string;
   sessionKey: string;

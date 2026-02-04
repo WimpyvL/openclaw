@@ -194,6 +194,11 @@ export type AgentDefaultsConfig = {
      */
     includeReasoning?: boolean;
   };
+  /** SANI identity + mode handling (default: disabled). */
+  sani?: {
+    /** Enable SANI identity + triggers. */
+    enabled?: boolean;
+  };
   /** Max concurrent agent runs across all conversations. Default: 1 (sequential). */
   maxConcurrent?: number;
   /** Sub-agent defaults (spawned via sessions_spawn). */

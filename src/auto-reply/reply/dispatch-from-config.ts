@@ -179,6 +179,7 @@ export async function dispatchReplyFromConfig(params: {
             threadId: ctx.MessageThreadId,
             originatingChannel: ctx.OriginatingChannel,
             originatingTo: ctx.OriginatingTo,
+            sessionKey: ctx.SessionKey,
             messageId: messageIdForHook,
             senderId: ctx.SenderId,
             senderName: ctx.SenderName,

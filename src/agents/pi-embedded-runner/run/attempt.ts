@@ -31,6 +31,7 @@ import { resolveOpenClawDocsPath } from "../../docs-path.js";
 import { isTimeoutError } from "../../failover-error.js";
 import { resolveModelAuthMode } from "../../model-auth.js";
 import { resolveDefaultModelForAgent } from "../../model-selection.js";
+import { readSaniSessionFlags, resolveSaniEnabled } from "../../sani.js";
 import {
   isCloudCodeAssistFormatError,
   resolveBootstrapMaxChars,
@@ -318,6 +319,11 @@ export async function runEmbeddedAttempt(
       agentId: sessionAgentId,
     });
     const defaultModelLabel = `${defaultModelRef.provider}/${defaultModelRef.model}`;
+    const saniEnabled = resolveSaniEnabled(params.config);
+    const saniFlags = readSaniSessionFlags({
+      config: params.config,
+      sessionKey: params.sessionKey,
+    });
     const { runtimeInfo, userTimezone, userTime, userTimeFormat } = buildSystemPromptParams({
       config: params.config,
       agentId: sessionAgentId,
@@ -371,6 +377,9 @@ export async function runEmbeddedAttempt(
       userTimeFormat,
       contextFiles,
       memoryCitationsMode: params.config?.memory?.citations,
+      saniEnabled,
+      saniMode: saniFlags.saniMode,
+      labyrinthMode: saniFlags.labyrinthMode,
     });
     const systemPromptReport = buildSystemPromptReport({
       source: "run",

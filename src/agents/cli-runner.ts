@@ -11,6 +11,7 @@ import { resolveUserPath } from "../utils.js";
 import { resolveSessionAgentIds } from "./agent-scope.js";
 import { makeBootstrapWarn, resolveBootstrapContextForRun } from "./bootstrap-files.js";
 import { resolveCliBackendConfig } from "./cli-backends.js";
+import { readSaniSessionFlags, resolveSaniEnabled } from "./sani.js";
 import {
   appendImagePathsToPrompt,
   buildCliArgs,
@@ -86,6 +87,11 @@ export async function runCliAgent(params: {
     sessionAgentId === defaultAgentId
       ? resolveHeartbeatPrompt(params.config?.agents?.defaults?.heartbeat?.prompt)
       : undefined;
+  const saniEnabled = resolveSaniEnabled(params.config);
+  const saniFlags = readSaniSessionFlags({
+    config: params.config,
+    sessionKey: params.sessionKey,
+  });
   const docsPath = await resolveOpenClawDocsPath({
     workspaceDir,
     argv1: process.argv[1],
@@ -104,6 +110,9 @@ export async function runCliAgent(params: {
     contextFiles,
     modelDisplay,
     agentId: sessionAgentId,
+    saniEnabled,
+    saniMode: saniFlags.saniMode,
+    labyrinthMode: saniFlags.labyrinthMode,
   });
 
   const { sessionId: cliSessionIdToSend, isNew } = resolveSessionIdToSend({

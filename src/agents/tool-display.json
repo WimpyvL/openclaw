@@ -286,6 +286,26 @@
       "title": "Memory Get",
       "detailKeys": ["path", "from", "lines"]
     },
+    "threadborn_write": {
+      "emoji": "🗒️",
+      "title": "ThreadBorn Write",
+      "detailKeys": ["title", "tags"]
+    },
+    "bridge_promote": {
+      "emoji": "🧭",
+      "title": "Bridge Promote",
+      "detailKeys": ["threadborn_file", "title"]
+    },
+    "vault_seal": {
+      "emoji": "🔒",
+      "title": "Vault Seal",
+      "detailKeys": ["source_file", "title"]
+    },
+    "labyrinth_snapshot": {
+      "emoji": "🧬",
+      "title": "Labyrinth Snapshot",
+      "detailKeys": ["title"]
+    },
     "web_search": {
       "emoji": "🔎",
       "title": "Web Search",
