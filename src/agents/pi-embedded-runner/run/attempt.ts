@@ -31,7 +31,6 @@ import { resolveOpenClawDocsPath } from "../../docs-path.js";
 import { isTimeoutError } from "../../failover-error.js";
 import { resolveModelAuthMode } from "../../model-auth.js";
 import { resolveDefaultModelForAgent } from "../../model-selection.js";
-import { readSaniSessionFlags, resolveSaniEnabled } from "../../sani.js";
 import {
   isCloudCodeAssistFormatError,
   resolveBootstrapMaxChars,
@@ -47,6 +46,7 @@ import { toClientToolDefinitions } from "../../pi-tool-definition-adapter.js";
 import { createOpenClawCodingTools } from "../../pi-tools.js";
 import { resolveSandboxContext } from "../../sandbox.js";
 import { resolveSandboxRuntimeStatus } from "../../sandbox/runtime-status.js";
+import { readSaniSessionFlags, resolveSaniEnabled } from "../../sani.js";
 import { repairSessionFileIfNeeded } from "../../session-file-repair.js";
 import { guardSessionManager } from "../../session-tool-result-guard-wrapper.js";
 import { acquireSessionWriteLock } from "../../session-write-lock.js";
@@ -320,9 +320,10 @@ export async function runEmbeddedAttempt(
     });
     const defaultModelLabel = `${defaultModelRef.provider}/${defaultModelRef.model}`;
     const saniEnabled = resolveSaniEnabled(params.config);
-    const saniFlags = readSaniSessionFlags({
+    const saniFlags = await readSaniSessionFlags({
       config: params.config,
       sessionKey: params.sessionKey,
+      workspaceDir: effectiveWorkspace,
     });
     const { runtimeInfo, userTimezone, userTime, userTimeFormat } = buildSystemPromptParams({
       config: params.config,

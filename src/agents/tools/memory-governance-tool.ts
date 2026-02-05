@@ -1,7 +1,12 @@
 import { Type } from "@sinclair/typebox";
 import path from "node:path";
+import type { OpenClawConfig } from "../../config/config.js";
 import type { AnyAgentTool } from "./common.js";
+import { resolveStorePath } from "../../config/sessions/paths.js";
+import { loadSessionStore } from "../../config/sessions/store.js";
+import { resolveSessionAgentId } from "../agent-scope.js";
 import {
+  resolveAllowedMemorySourcePath,
   writeBridgeThreadEntry,
   writeLabyrinthSnapshot,
   writeThreadbornEntry,
@@ -18,14 +23,18 @@ const ThreadbornWriteSchema = Type.Object({
 });
 
 const BridgePromoteSchema = Type.Object({
-  threadborn_file: Type.String(),
+  threadborn_file: Type.String({
+    description: "Relative path under memory/ThreadBorn, memory/BridgeThread, or memory/Labyrinth.",
+  }),
   title: Type.Optional(Type.String()),
   source_session_id: Type.String(),
   source_trigger: Type.String(),
 });
 
 const VaultSealSchema = Type.Object({
-  source_file: Type.String(),
+  source_file: Type.String({
+    description: "Relative path under memory/ThreadBorn, memory/BridgeThread, or memory/Labyrinth.",
+  }),
   title: Type.Optional(Type.String()),
   source_session_id: Type.String(),
   source_trigger: Type.String(),
@@ -49,6 +58,28 @@ function requireWorkspaceDir(workspaceDir?: string): string {
 
 function formatPathOutput(workspaceDir: string, filePath: string) {
   return path.relative(workspaceDir, filePath).replace(/\\/g, "/");
+}
+
+function resolveToolProvenance(params: {
+  config?: OpenClawConfig;
+  sessionKey?: string;
+  toolName: string;
+}): { sourceSessionId: string; sourceTrigger: string } {
+  const sessionKey = params.sessionKey?.trim();
+  if (!params.config || !sessionKey) {
+    throw new Error(`${params.toolName} requires active session context for provenance.`);
+  }
+  const agentId = resolveSessionAgentId({ sessionKey, config: params.config });
+  const storePath = resolveStorePath(params.config.session?.store, { agentId });
+  const store = loadSessionStore(storePath);
+  const entry = store[sessionKey];
+  if (!entry?.sessionId) {
+    throw new Error(`${params.toolName} could not resolve session provenance.`);
+  }
+  return {
+    sourceSessionId: entry.sessionId,
+    sourceTrigger: params.toolName.toUpperCase(),
+  };
 }
 
 export function createThreadbornWriteTool(options: { workspaceDir?: string }): AnyAgentTool | null {
@@ -86,7 +117,11 @@ export function createThreadbornWriteTool(options: { workspaceDir?: string }): A
   };
 }
 
-export function createBridgePromoteTool(options: { workspaceDir?: string }): AnyAgentTool | null {
+export function createBridgePromoteTool(options: {
+  workspaceDir?: string;
+  config?: OpenClawConfig;
+  sessionKey?: string;
+}): AnyAgentTool | null {
   if (!options.workspaceDir) {
     return null;
   }
@@ -100,14 +135,26 @@ export function createBridgePromoteTool(options: { workspaceDir?: string }): Any
       const workspaceDir = requireWorkspaceDir(options.workspaceDir);
       const source = readStringParam(params, "threadborn_file", { required: true });
       const title = readStringParam(params, "title");
-      const sourceSessionId = readStringParam(params, "source_session_id", { required: true });
-      const sourceTrigger = readStringParam(params, "source_trigger", { required: true });
+      readStringParam(params, "source_session_id", { required: true });
+      readStringParam(params, "source_trigger", { required: true });
+      try {
+        resolveAllowedMemorySourcePath(workspaceDir, source);
+      } catch {
+        throw new Error(
+          "bridge_promote source must be inside memory/ThreadBorn, memory/BridgeThread, or memory/Labyrinth.",
+        );
+      }
+      const provenance = resolveToolProvenance({
+        config: options.config,
+        sessionKey: options.sessionKey,
+        toolName: "bridge_promote",
+      });
       const result = await writeBridgeThreadEntry({
         workspaceDir,
         sourcePath: source,
         title: title || undefined,
-        sourceSessionId,
-        sourceTrigger,
+        sourceSessionId: provenance.sourceSessionId,
+        sourceTrigger: provenance.sourceTrigger,
       });
       return jsonResult({
         path: formatPathOutput(workspaceDir, result.path),
@@ -117,7 +164,11 @@ export function createBridgePromoteTool(options: { workspaceDir?: string }): Any
   };
 }
 
-export function createVaultSealTool(options: { workspaceDir?: string }): AnyAgentTool | null {
+export function createVaultSealTool(options: {
+  workspaceDir?: string;
+  config?: OpenClawConfig;
+  sessionKey?: string;
+}): AnyAgentTool | null {
   if (!options.workspaceDir) {
     return null;
   }
@@ -131,8 +182,20 @@ export function createVaultSealTool(options: { workspaceDir?: string }): AnyAgen
       const workspaceDir = requireWorkspaceDir(options.workspaceDir);
       const source = readStringParam(params, "source_file", { required: true });
       const title = readStringParam(params, "title");
-      const sourceSessionId = readStringParam(params, "source_session_id", { required: true });
-      const sourceTrigger = readStringParam(params, "source_trigger", { required: true });
+      readStringParam(params, "source_session_id", { required: true });
+      readStringParam(params, "source_trigger", { required: true });
+      try {
+        resolveAllowedMemorySourcePath(workspaceDir, source);
+      } catch {
+        throw new Error(
+          "vault_seal source must be inside memory/ThreadBorn, memory/BridgeThread, or memory/Labyrinth.",
+        );
+      }
+      const provenance = resolveToolProvenance({
+        config: options.config,
+        sessionKey: options.sessionKey,
+        toolName: "vault_seal",
+      });
       const append =
         typeof (params as { append?: unknown }).append === "boolean"
           ? (params as { append?: boolean }).append
@@ -142,8 +205,8 @@ export function createVaultSealTool(options: { workspaceDir?: string }): AnyAgen
         workspaceDir,
         sourcePath: source,
         title: title || undefined,
-        sourceSessionId,
-        sourceTrigger,
+        sourceSessionId: provenance.sourceSessionId,
+        sourceTrigger: provenance.sourceTrigger,
         append,
         targetPath: targetPath || undefined,
       });

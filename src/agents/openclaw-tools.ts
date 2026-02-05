@@ -152,8 +152,16 @@ export function createOpenClawTools(options?: {
     ...(options?.workspaceDir
       ? [
           createThreadbornWriteTool({ workspaceDir: options.workspaceDir }),
-          createBridgePromoteTool({ workspaceDir: options.workspaceDir }),
-          createVaultSealTool({ workspaceDir: options.workspaceDir }),
+          createBridgePromoteTool({
+            workspaceDir: options.workspaceDir,
+            config: options?.config,
+            sessionKey: options?.agentSessionKey,
+          }),
+          createVaultSealTool({
+            workspaceDir: options.workspaceDir,
+            config: options?.config,
+            sessionKey: options?.agentSessionKey,
+          }),
           createLabyrinthSnapshotTool({ workspaceDir: options.workspaceDir }),
         ].filter((tool): tool is AnyAgentTool => Boolean(tool))
       : []),

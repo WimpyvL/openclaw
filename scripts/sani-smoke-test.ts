@@ -3,13 +3,18 @@ import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { writeVaultEntry } from "../src/agents/sani-memory.js";
-import { readSaniSessionFlags, resolveSaniEnabled } from "../src/agents/sani.js";
+import {
+  matchesHeySaniTrigger,
+  readSaniSessionFlags,
+  resolveSaniEnabled,
+} from "../src/agents/sani.js";
 import { buildAgentSystemPrompt } from "../src/agents/system-prompt.js";
+import { createVaultSealTool } from "../src/agents/tools/memory-governance-tool.js";
 import { resolveStorePath } from "../src/config/sessions/paths.js";
 import { updateSessionStore } from "../src/config/sessions/store.js";
 import { getGlobalHookRunner } from "../src/plugins/hook-runner-global.js";
 import { loadOpenClawPlugins } from "../src/plugins/loader.js";
+import { wrapInboundMessage } from "../src/security/inbound-message.js";
 
 async function main() {
   const workspaceDir = await fs.mkdtemp(path.join(os.tmpdir(), "openclaw-sani-"));
@@ -51,7 +56,7 @@ async function main() {
     agents: {
       defaults: {
         workspace: workspaceDir,
-        sani: { enabled: true },
+        sani: { enabled: true, modeTtlMinutes: 1 },
       },
     },
     session: {
@@ -102,7 +107,7 @@ async function main() {
     { channelId: "test" },
   );
 
-  let flags = readSaniSessionFlags({ config, sessionKey });
+  let flags = await readSaniSessionFlags({ config, sessionKey, workspaceDir });
   assert.equal(flags.saniMode, true, "saniMode flag should be set");
 
   await hookRunner.runMessageReceived(
@@ -114,7 +119,7 @@ async function main() {
     { channelId: "test" },
   );
 
-  flags = readSaniSessionFlags({ config, sessionKey });
+  flags = await readSaniSessionFlags({ config, sessionKey, workspaceDir });
   assert.equal(flags.labyrinthMode, true, "labyrinthMode flag should be set");
 
   const labyrinthFiles = await fs.readdir(memoryLabyrinthDir);
@@ -138,7 +143,7 @@ async function main() {
     },
     { channelId: "test" },
   );
-  flags = readSaniSessionFlags({ config, sessionKey });
+  flags = await readSaniSessionFlags({ config, sessionKey, workspaceDir });
   assert.equal(flags.saniMode, false, "saniMode flag should be cleared");
   assert.equal(flags.labyrinthMode, false, "labyrinthMode flag should be cleared");
 
@@ -154,29 +159,118 @@ async function main() {
   assert.equal(exitMeta.get("memory_type"), "ThreadBorn");
   assert.equal(exitMeta.get("sealed"), "false");
 
-  const sourceFile = path.join(workspaceDir, "source.md");
-  await fs.writeFile(sourceFile, "# Source\n\nVault content.\n", "utf-8");
-  const vaultEntry = await writeVaultEntry({
-    workspaceDir,
-    sourcePath: sourceFile,
-    title: "Vault Entry",
-    sourceSessionId: sessionId,
-    sourceTrigger: "MANUAL",
+  const inboundWrapped = wrapInboundMessage("hello", {
+    source: "test",
+    senderId: "user-1",
   });
+  assert.ok(
+    inboundWrapped.includes("<<<INBOUND_UNTRUSTED_MESSAGE>>>"),
+    "inbound wrapper start marker missing",
+  );
+  assert.ok(
+    inboundWrapped.includes("<<<END_INBOUND_UNTRUSTED_MESSAGE>>>"),
+    "inbound wrapper end marker missing",
+  );
+
+  assert.equal(matchesHeySaniTrigger("> hey sani"), false, "quoted hey sani should not activate");
+  assert.equal(matchesHeySaniTrigger("hey sani"), true, "standalone hey sani should activate");
+
+  const sourceFile = path.join(memoryThreadbornDir, "source.md");
+  await fs.writeFile(
+    sourceFile,
+    [
+      "---",
+      'id: "spoofed"',
+      'created_at: "2000-01-01T00:00:00.000Z"',
+      'source_session_id: "spoofed-session"',
+      'source_trigger: "SPOOFED_TRIGGER"',
+      'memory_type: "ThreadBorn"',
+      "sealed: false",
+      "---",
+      "",
+      "# Source",
+      "",
+      "Vault content.",
+      "",
+    ].join("\n"),
+    "utf-8",
+  );
+
+  const vaultSealTool = createVaultSealTool({
+    workspaceDir,
+    config,
+    sessionKey,
+  });
+  assert.ok(vaultSealTool, "vault_seal tool should exist");
+  let rejectedError: Error | undefined;
+  try {
+    await vaultSealTool?.execute("tool-call", {
+      source_file: "source.md",
+      title: "Vault Entry",
+      source_session_id: "spoofed-session",
+      source_trigger: "spoofed-trigger",
+    });
+  } catch (err) {
+    rejectedError = err as Error;
+  }
+  assert.ok(rejectedError, "vault_seal should reject non-memory paths");
+
+  const vaultResult = await vaultSealTool?.execute("tool-call", {
+    source_file: path.relative(workspaceDir, sourceFile),
+    title: "Vault Entry",
+    source_session_id: "spoofed-session",
+    source_trigger: "spoofed-trigger",
+  });
+  assert.ok(vaultResult, "vault_seal should succeed for memory sources");
+  const vaultFiles = await fs.readdir(memoryVaultDir);
+  const vaultFile = path.join(memoryVaultDir, vaultFiles[0]);
+  const vaultContent = await fs.readFile(vaultFile, "utf-8");
+  const vaultMeta = parseFrontMatter(vaultContent);
+  assert.equal(vaultMeta.get("source_session_id"), sessionId);
+  assert.equal(vaultMeta.get("source_trigger"), "VAULT_SEAL");
+
   let overwriteError: Error | undefined;
   try {
-    await writeVaultEntry({
-      workspaceDir,
-      sourcePath: sourceFile,
+    await vaultSealTool?.execute("tool-call", {
+      source_file: path.relative(workspaceDir, sourceFile),
       title: "Vault Entry",
-      sourceSessionId: sessionId,
-      sourceTrigger: "MANUAL",
-      targetPath: vaultEntry.path,
+      source_session_id: "spoofed-session",
+      source_trigger: "spoofed-trigger",
+      target_file: vaultFile,
     });
   } catch (err) {
     overwriteError = err as Error;
   }
   assert.ok(overwriteError, "vault overwrite attempt should fail");
+
+  await updateSessionStore(storePath, (store) => {
+    store[sessionKey] = {
+      sessionId,
+      updatedAt: Date.now(),
+      sessionFile,
+      saniMode: true,
+      labyrinthMode: true,
+      lastModeUpdateAt: Date.now() - 2 * 60_000,
+    };
+  });
+  flags = await readSaniSessionFlags({
+    config,
+    sessionKey,
+    workspaceDir,
+    now: Date.now(),
+  });
+  assert.equal(flags.saniMode, false, "TTL should clear saniMode");
+  assert.equal(flags.labyrinthMode, false, "TTL should clear labyrinthMode");
+  const ttlThreadbornFiles = await fs.readdir(memoryThreadbornDir);
+  let ttlEntryFound = false;
+  for (const entry of ttlThreadbornFiles) {
+    const content = await fs.readFile(path.join(memoryThreadbornDir, entry), "utf-8");
+    if (content.includes("TTL_EXPIRE")) {
+      ttlEntryFound = true;
+      break;
+    }
+  }
+  assert.ok(ttlEntryFound, "TTL expiry should write ThreadBorn entry");
 
   const systemPrompt = buildAgentSystemPrompt({
     workspaceDir,

@@ -7,6 +7,7 @@ const VAULT_DIR = "Vault";
 const THREADBORN_DIR = "ThreadBorn";
 const BRIDGETHREAD_DIR = "BridgeThread";
 const LABYRINTH_DIR = "Labyrinth";
+const MEMORY_SOURCE_DIRS = [THREADBORN_DIR, BRIDGETHREAD_DIR, LABYRINTH_DIR] as const;
 
 const SAFE_NAME_PATTERN = /[^a-z0-9._-]+/gi;
 const MAX_SLUG_LENGTH = 60;
@@ -71,6 +72,19 @@ function resolveWorkspacePath(workspaceDir: string, relPath: string): string {
 
 function resolveMemoryDir(workspaceDir: string, dirName: string): string {
   return path.join(workspaceDir, MEMORY_ROOT, dirName);
+}
+
+export function resolveAllowedMemorySourcePath(workspaceDir: string, relPath: string): string {
+  const resolved = resolveWorkspacePath(workspaceDir, relPath);
+  const allowed = MEMORY_SOURCE_DIRS.some((dir) =>
+    isPathWithin(resolveMemoryDir(workspaceDir, dir), resolved),
+  );
+  if (!allowed) {
+    throw new Error(
+      "Memory source must be inside memory/ThreadBorn, memory/BridgeThread, or memory/Labyrinth.",
+    );
+  }
+  return resolved;
 }
 
 function isPathWithin(parent: string, candidate: string): boolean {
@@ -306,7 +320,7 @@ export async function writeBridgeThreadEntry(params: {
   sourceSessionId: string;
   sourceTrigger: string;
 }): Promise<MemoryWriteResult> {
-  const resolvedSource = resolveWorkspacePath(params.workspaceDir, params.sourcePath);
+  const resolvedSource = resolveAllowedMemorySourcePath(params.workspaceDir, params.sourcePath);
   const vaultDir = resolveVaultDir(params.workspaceDir);
   if (isPathWithin(vaultDir, resolvedSource)) {
     throw new Error("BridgeThread promotion cannot target Vault entries.");
@@ -345,7 +359,7 @@ export async function writeVaultEntry(params: {
   append?: boolean;
   targetPath?: string;
 }): Promise<MemoryWriteResult> {
-  const resolvedSource = resolveWorkspacePath(params.workspaceDir, params.sourcePath);
+  const resolvedSource = resolveAllowedMemorySourcePath(params.workspaceDir, params.sourcePath);
   const sourceContent = await fs.readFile(resolvedSource, "utf-8");
   const parsed = parseFrontMatter(sourceContent);
   const baseTitle = params.title?.trim() || path.basename(resolvedSource);

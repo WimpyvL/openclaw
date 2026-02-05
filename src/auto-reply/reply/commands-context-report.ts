@@ -7,12 +7,12 @@ import { resolveDefaultModelForAgent } from "../../agents/model-selection.js";
 import { resolveBootstrapMaxChars } from "../../agents/pi-embedded-helpers.js";
 import { createOpenClawCodingTools } from "../../agents/pi-tools.js";
 import { resolveSandboxRuntimeStatus } from "../../agents/sandbox.js";
+import { readSaniSessionFlags, resolveSaniEnabled } from "../../agents/sani.js";
 import { buildWorkspaceSkillSnapshot } from "../../agents/skills.js";
 import { getSkillsSnapshotVersion } from "../../agents/skills/refresh.js";
 import { buildSystemPromptParams } from "../../agents/system-prompt-params.js";
 import { buildSystemPromptReport } from "../../agents/system-prompt-report.js";
 import { buildAgentSystemPrompt } from "../../agents/system-prompt.js";
-import { readSaniSessionFlags, resolveSaniEnabled } from "../../agents/sani.js";
 import { buildToolSummaryMap } from "../../agents/tool-summaries.js";
 import { getRemoteSkillEligibility } from "../../infra/skills-remote.js";
 import { buildTtsSystemPromptHint } from "../../tts/tts.js";
@@ -138,9 +138,10 @@ async function resolveContextReport(
     : { enabled: false };
   const ttsHint = params.cfg ? buildTtsSystemPromptHint(params.cfg) : undefined;
   const saniEnabled = resolveSaniEnabled(params.cfg);
-  const saniFlags = readSaniSessionFlags({
+  const saniFlags = await readSaniSessionFlags({
     config: params.cfg,
     sessionKey: params.sessionKey,
+    workspaceDir,
   });
 
   const systemPrompt = buildAgentSystemPrompt({

@@ -11,7 +11,6 @@ import { resolveUserPath } from "../utils.js";
 import { resolveSessionAgentIds } from "./agent-scope.js";
 import { makeBootstrapWarn, resolveBootstrapContextForRun } from "./bootstrap-files.js";
 import { resolveCliBackendConfig } from "./cli-backends.js";
-import { readSaniSessionFlags, resolveSaniEnabled } from "./sani.js";
 import {
   appendImagePathsToPrompt,
   buildCliArgs,
@@ -30,6 +29,7 @@ import {
 import { resolveOpenClawDocsPath } from "./docs-path.js";
 import { FailoverError, resolveFailoverStatus } from "./failover-error.js";
 import { classifyFailoverReason, isFailoverErrorMessage } from "./pi-embedded-helpers.js";
+import { readSaniSessionFlags, resolveSaniEnabled } from "./sani.js";
 
 const log = createSubsystemLogger("agent/claude-cli");
 
@@ -88,9 +88,10 @@ export async function runCliAgent(params: {
       ? resolveHeartbeatPrompt(params.config?.agents?.defaults?.heartbeat?.prompt)
       : undefined;
   const saniEnabled = resolveSaniEnabled(params.config);
-  const saniFlags = readSaniSessionFlags({
+  const saniFlags = await readSaniSessionFlags({
     config: params.config,
     sessionKey: params.sessionKey,
+    workspaceDir,
   });
   const docsPath = await resolveOpenClawDocsPath({
     workspaceDir,

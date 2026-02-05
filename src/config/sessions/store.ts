@@ -383,12 +383,14 @@ export async function updateSessionModeFlags(params: {
   flags: { saniMode?: boolean; labyrinthMode?: boolean };
 }): Promise<SessionEntry | null> {
   const { storePath, sessionKey, flags } = params;
+  const now = Date.now();
   return await updateSessionStoreEntry({
     storePath,
     sessionKey,
     update: async () => ({
       saniMode: flags.saniMode,
       labyrinthMode: flags.labyrinthMode,
+      lastModeUpdateAt: now,
     }),
   });
 }
