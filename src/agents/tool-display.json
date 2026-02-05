@@ -289,12 +289,17 @@
     "threadborn_write": {
       "emoji": "🗒️",
       "title": "ThreadBorn Write",
-      "detailKeys": ["title", "tags"]
+      "detailKeys": ["title", "tags", "folder"]
     },
     "bridge_promote": {
       "emoji": "🧭",
       "title": "Bridge Promote",
       "detailKeys": ["threadborn_file", "title"]
+    },
+    "vault_query": {
+      "emoji": "🔎",
+      "title": "Vault Query",
+      "detailKeys": ["scope", "tags"]
     },
     "vault_seal": {
       "emoji": "🔒",

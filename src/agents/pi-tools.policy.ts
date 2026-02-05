@@ -95,6 +95,7 @@ const DEFAULT_SUBAGENT_TOOL_DENY = [
   "memory_get",
   "threadborn_write",
   "bridge_promote",
+  "vault_query",
   "vault_seal",
   "labyrinth_snapshot",
 ];
