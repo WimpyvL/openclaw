@@ -59,6 +59,8 @@ export type SessionEntry = {
   saniMode?: boolean;
   /** Session flag: Labyrinth response mode enabled for this session. */
   labyrinthMode?: boolean;
+  /** Timestamp (ms) when SANI/Labyrinth modes last changed. */
+  lastModeUpdateAt?: number;
   sendPolicy?: "allow" | "deny";
   queueMode?:
     | "steer"

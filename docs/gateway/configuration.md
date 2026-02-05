@@ -1462,6 +1462,19 @@ Use this for pre-seeded deployments where your workspace files come from a repo.
 }
 ```
 
+### `agents.defaults.sani`
+
+Configures the SANI identity trigger handling.
+
+- `enabled`: enable SANI mode/triggers (default: `false`).
+- `modeTtlMinutes`: auto-clear SANI/Labyrinth modes after this many minutes (default: `720`).
+
+```json5
+{
+  agents: { defaults: { sani: { enabled: true, modeTtlMinutes: 720 } } },
+}
+```
+
 ### `agents.defaults.bootstrapMaxChars`
 
 Max characters of each workspace bootstrap file injected into the system prompt

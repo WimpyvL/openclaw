@@ -198,6 +198,8 @@ export type AgentDefaultsConfig = {
   sani?: {
     /** Enable SANI identity + triggers. */
     enabled?: boolean;
+    /** TTL for SANI/Labyrinth modes (minutes). Default: 720 (12 hours). */
+    modeTtlMinutes?: number;
   };
   /** Max concurrent agent runs across all conversations. Default: 1 (sequential). */
   maxConcurrent?: number;

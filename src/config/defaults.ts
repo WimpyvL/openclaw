@@ -33,6 +33,7 @@ const DEFAULT_MODEL_COST: ModelDefinitionConfig["cost"] = {
 };
 const DEFAULT_MODEL_INPUT: ModelDefinitionConfig["input"] = ["text"];
 const DEFAULT_MODEL_MAX_TOKENS = 8192;
+const DEFAULT_SANI_MODE_TTL_MINUTES = 720;
 
 type ModelDefinitionLike = Partial<ModelDefinitionConfig> &
   Pick<ModelDefinitionConfig, "id" | "name">;
@@ -298,7 +299,10 @@ export function applyAgentDefaults(cfg: OpenClawConfig): OpenClawConfig {
   const hasSubMax =
     typeof defaults?.subagents?.maxConcurrent === "number" &&
     Number.isFinite(defaults.subagents.maxConcurrent);
-  if (hasMax && hasSubMax) {
+  const hasSaniTtl =
+    typeof defaults?.sani?.modeTtlMinutes === "number" &&
+    Number.isFinite(defaults.sani.modeTtlMinutes);
+  if (hasMax && hasSubMax && hasSaniTtl) {
     return cfg;
   }
 
@@ -314,6 +318,11 @@ export function applyAgentDefaults(cfg: OpenClawConfig): OpenClawConfig {
     nextSubagents.maxConcurrent = DEFAULT_SUBAGENT_MAX_CONCURRENT;
     mutated = true;
   }
+  const nextSani = defaults?.sani ? { ...defaults.sani } : {};
+  if (!hasSaniTtl) {
+    nextSani.modeTtlMinutes = DEFAULT_SANI_MODE_TTL_MINUTES;
+    mutated = true;
+  }
 
   if (!mutated) {
     return cfg;
@@ -326,6 +335,7 @@ export function applyAgentDefaults(cfg: OpenClawConfig): OpenClawConfig {
       defaults: {
         ...nextDefaults,
         subagents: nextSubagents,
+        sani: nextSani,
       },
     },
   };

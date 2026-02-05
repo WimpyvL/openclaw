@@ -23,6 +23,7 @@ import {
 import { logVerbose } from "../../globals.js";
 import { clearCommandLane, getQueueSize } from "../../process/command-queue.js";
 import { normalizeMainKey } from "../../routing/session-key.js";
+import { wrapInboundMessage } from "../../security/inbound-message.js";
 import { isReasoningTagProvider } from "../../utils/provider-utils.js";
 import { hasControlCommand } from "../command-detection.js";
 import { buildInboundMediaNote } from "../media-note.js";
@@ -209,8 +210,15 @@ export async function runPreparedReply(
       text: "I didn't receive any text in your message. Please resend or add a caption.",
     };
   }
+  const wrappedInbound = wrapInboundMessage(baseBodyFinal, {
+    source: ctx.OriginatingChannel ?? sessionCtx.Provider ?? "unknown",
+    senderId: sessionCtx.SenderId?.trim(),
+    senderName: sessionCtx.SenderName?.trim(),
+    senderUsername: sessionCtx.SenderUsername?.trim(),
+    senderE164: sessionCtx.SenderE164?.trim(),
+  });
   let prefixedBodyBase = await applySessionHints({
-    baseBody: baseBodyFinal,
+    baseBody: wrappedInbound,
     abortedLastRun,
     sessionEntry,
     sessionStore,
@@ -311,7 +319,7 @@ export async function runPreparedReply(
   }
   const sessionIdFinal = sessionId ?? crypto.randomUUID();
   const sessionFile = resolveSessionFilePath(sessionIdFinal, sessionEntry);
-  const queueBodyBase = [threadStarterNote, baseBodyFinal].filter(Boolean).join("\n\n");
+  const queueBodyBase = [threadStarterNote, wrappedInbound].filter(Boolean).join("\n\n");
   const queueMessageId = sessionCtx.MessageSid?.trim();
   const queueMessageIdHint = queueMessageId ? `[message_id: ${queueMessageId}]` : "";
   const queueBodyWithId = queueMessageIdHint
