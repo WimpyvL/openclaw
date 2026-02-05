@@ -13,6 +13,7 @@ import {
   createBridgePromoteTool,
   createLabyrinthSnapshotTool,
   createThreadbornWriteTool,
+  createVaultQueryTool,
   createVaultSealTool,
 } from "./tools/memory-governance-tool.js";
 import { createMessageTool } from "./tools/message-tool.js";
@@ -162,6 +163,7 @@ export function createOpenClawTools(options?: {
             config: options?.config,
             sessionKey: options?.agentSessionKey,
           }),
+          createVaultQueryTool({ workspaceDir: options.workspaceDir }),
           createLabyrinthSnapshotTool({ workspaceDir: options.workspaceDir }),
         ].filter((tool): tool is AnyAgentTool => Boolean(tool))
       : []),

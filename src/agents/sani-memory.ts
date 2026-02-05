@@ -250,6 +250,18 @@ function resolveVaultDir(workspaceDir: string): string {
   return resolveMemoryDir(workspaceDir, VAULT_DIR);
 }
 
+function resolveThreadbornDir(workspaceDir: string, folder?: string): string {
+  const base = resolveMemoryDir(workspaceDir, THREADBORN_DIR);
+  if (!folder?.trim()) {
+    return base;
+  }
+  const resolved = path.resolve(base, folder.trim());
+  if (!isPathWithin(base, resolved)) {
+    throw new Error("ThreadBorn folder must be inside memory/ThreadBorn.");
+  }
+  return resolved;
+}
+
 async function writeUniqueFile(params: {
   dir: string;
   filenameBase: string;
@@ -281,6 +293,7 @@ export async function writeThreadbornEntry(params: {
   title: string;
   body: string;
   tags?: string[];
+  folder?: string;
   sourceSessionId: string;
   sourceTrigger: string;
 }): Promise<MemoryWriteResult> {
@@ -309,7 +322,7 @@ export async function writeThreadbornEntry(params: {
   ]
     .filter(Boolean)
     .join("\n");
-  const dir = resolveMemoryDir(params.workspaceDir, THREADBORN_DIR);
+  const dir = resolveThreadbornDir(params.workspaceDir, params.folder);
   return await writeUniqueFile({ dir, filenameBase, content });
 }
 

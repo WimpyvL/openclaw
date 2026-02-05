@@ -1,4 +1,6 @@
+import type { Dirent } from "node:fs";
 import { Type } from "@sinclair/typebox";
+import fs from "node:fs/promises";
 import path from "node:path";
 import type { OpenClawConfig } from "../../config/config.js";
 import type { AnyAgentTool } from "./common.js";
@@ -12,12 +14,14 @@ import {
   writeThreadbornEntry,
   writeVaultEntry,
 } from "../sani-memory.js";
+import { stringEnum } from "../schema/typebox.js";
 import { jsonResult, readStringParam } from "./common.js";
 
 const ThreadbornWriteSchema = Type.Object({
   title: Type.String(),
   body: Type.String(),
   tags: Type.Optional(Type.Array(Type.String())),
+  folder: Type.Optional(Type.String()),
   source_session_id: Type.String(),
   source_trigger: Type.String(),
 });
@@ -49,6 +53,13 @@ const LabyrinthSnapshotSchema = Type.Object({
   source_trigger: Type.String(),
 });
 
+const VAULT_QUERY_SCOPES = ["identity", "decisions", "history"] as const;
+
+const VaultQuerySchema = Type.Object({
+  scope: stringEnum(VAULT_QUERY_SCOPES),
+  tags: Type.Optional(Type.Array(Type.String())),
+});
+
 function requireWorkspaceDir(workspaceDir?: string): string {
   if (!workspaceDir?.trim()) {
     throw new Error("workspaceDir required");
@@ -58,6 +69,105 @@ function requireWorkspaceDir(workspaceDir?: string): string {
 
 function formatPathOutput(workspaceDir: string, filePath: string) {
   return path.relative(workspaceDir, filePath).replace(/\\/g, "/");
+}
+
+const VAULT_PREVIEW_LINES = 4;
+
+async function resolveVaultScopeDir(workspaceDir: string, scope: string): Promise<string> {
+  const vaultDir = path.join(workspaceDir, "memory", "Vault");
+  const scopedDir = path.join(vaultDir, scope);
+  if (await isDirectory(scopedDir)) {
+    return scopedDir;
+  }
+  return vaultDir;
+}
+
+async function isDirectory(dirPath: string): Promise<boolean> {
+  try {
+    const stats = await fs.stat(dirPath);
+    return stats.isDirectory();
+  } catch {
+    return false;
+  }
+}
+
+async function listMarkdownFiles(dirPath: string): Promise<string[]> {
+  let entries: Dirent[];
+  try {
+    entries = await fs.readdir(dirPath, { withFileTypes: true });
+  } catch {
+    return [];
+  }
+  const files: string[] = [];
+  for (const entry of entries) {
+    const resolved = path.join(dirPath, entry.name);
+    if (entry.isDirectory()) {
+      files.push(...(await listMarkdownFiles(resolved)));
+      continue;
+    }
+    if (entry.isFile() && entry.name.toLowerCase().endsWith(".md")) {
+      files.push(resolved);
+    }
+  }
+  return files;
+}
+
+function stripFrontMatter(lines: string[]): string[] {
+  if (lines[0] !== "---") {
+    return lines;
+  }
+  for (let i = 1; i < lines.length; i += 1) {
+    if (lines[i].trim() === "---") {
+      return lines.slice(i + 1);
+    }
+  }
+  return lines;
+}
+
+function extractTitleAndPreview(content: string): { title: string; preview: string } {
+  const rawLines = content.split(/\r?\n/);
+  const lines = stripFrontMatter(rawLines);
+  let title = "";
+  let startIndex = 0;
+  for (let i = 0; i < lines.length; i += 1) {
+    const line = lines[i]?.trim();
+    if (!line) {
+      continue;
+    }
+    if (line.startsWith("#")) {
+      title = line.replace(/^#+\s*/, "").trim();
+      startIndex = i + 1;
+    } else if (!title) {
+      title = line;
+      startIndex = i + 1;
+    }
+    if (title) {
+      break;
+    }
+  }
+  const previewLines: string[] = [];
+  for (let i = startIndex; i < lines.length; i += 1) {
+    const line = lines[i]?.trimEnd() ?? "";
+    if (!line && previewLines.length === 0) {
+      continue;
+    }
+    previewLines.push(line);
+    if (previewLines.length >= VAULT_PREVIEW_LINES) {
+      break;
+    }
+  }
+  return {
+    title: title || "Vault Entry",
+    preview: previewLines.join("\n").trim(),
+  };
+}
+
+function matchesTags(content: string, tags?: string[]): boolean {
+  if (!tags || tags.length === 0) {
+    return true;
+  }
+  const lower = content.toLowerCase();
+  return tags.every((tag) => lower.includes(tag.toLowerCase()));
 }
 
 function resolveToolProvenance(params: {
@@ -90,12 +200,13 @@ export function createThreadbornWriteTool(options: { workspaceDir?: string }): A
     label: "ThreadBorn Write",
     name: "threadborn_write",
     description:
-      "Write a new ThreadBorn working memory note (timestamped) under memory/ThreadBorn/.",
+      "Write a new ThreadBorn working memory note (timestamped) under memory/ThreadBorn/ (optionally a subfolder).",
     parameters: ThreadbornWriteSchema,
     execute: async (_toolCallId, params) => {
       const workspaceDir = requireWorkspaceDir(options.workspaceDir);
       const title = readStringParam(params, "title", { required: true });
       const body = readStringParam(params, "body", { required: true });
+      const folder = readStringParam(params, "folder");
       const tags = Array.isArray((params as { tags?: unknown }).tags)
         ? (params as { tags?: string[] }).tags
         : undefined;
@@ -106,6 +217,7 @@ export function createThreadbornWriteTool(options: { workspaceDir?: string }): A
         title,
         body,
         tags,
+        folder: folder || undefined,
         sourceSessionId,
         sourceTrigger,
       });
@@ -246,6 +358,41 @@ export function createLabyrinthSnapshotTool(options: {
         path: formatPathOutput(workspaceDir, result.path),
         filename: result.filename,
       });
+    },
+  };
+}
+
+export function createVaultQueryTool(options: { workspaceDir?: string }): AnyAgentTool | null {
+  if (!options.workspaceDir) {
+    return null;
+  }
+  return {
+    label: "Vault Query",
+    name: "vault_query",
+    description: "Read-only query of Vault entries with title + preview lines.",
+    parameters: VaultQuerySchema,
+    execute: async (_toolCallId, params) => {
+      const workspaceDir = requireWorkspaceDir(options.workspaceDir);
+      const scope = readStringParam(params, "scope", { required: true });
+      const tags = Array.isArray((params as { tags?: unknown }).tags)
+        ? (params as { tags?: string[] }).tags
+        : undefined;
+      const vaultDir = await resolveVaultScopeDir(workspaceDir, scope);
+      const files = await listMarkdownFiles(vaultDir);
+      const results = [];
+      for (const filePath of files) {
+        const content = await fs.readFile(filePath, "utf-8");
+        if (!matchesTags(content, tags)) {
+          continue;
+        }
+        const { title, preview } = extractTitleAndPreview(content);
+        results.push({
+          path: formatPathOutput(workspaceDir, filePath),
+          title,
+          preview,
+        });
+      }
+      return jsonResult({ scope, results });
     },
   };
 }
