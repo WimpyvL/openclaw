@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import type { OpenClawConfig } from "../config/config.js";
+import { resolveAgentPersona } from "./agent-scope.js";
 import {
   formatUserTime,
   resolveUserTimeFormat,
@@ -10,6 +11,7 @@ import {
 
 export type RuntimeInfoInput = {
   agentId?: string;
+  persona?: string;
   host: string;
   os: string;
   arch: string;
@@ -48,6 +50,10 @@ export function buildSystemPromptParams(params: {
   return {
     runtimeInfo: {
       agentId: params.agentId,
+      persona:
+        params.config && params.agentId
+          ? resolveAgentPersona(params.config, params.agentId)
+          : undefined,
       ...params.runtime,
       repoRoot,
     },

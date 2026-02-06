@@ -247,6 +247,7 @@ export function buildAgentSystemPrompt(params: {
   promptMode?: PromptMode;
   runtimeInfo?: {
     agentId?: string;
+    persona?: string;
     host?: string;
     os?: string;
     arch?: string;
@@ -690,6 +691,7 @@ export function buildAgentSystemPrompt(params: {
 export function buildRuntimeLine(
   runtimeInfo?: {
     agentId?: string;
+    persona?: string;
     host?: string;
     os?: string;
     arch?: string;
@@ -704,6 +706,7 @@ export function buildRuntimeLine(
 ): string {
   return `Runtime: ${[
     runtimeInfo?.agentId ? `agent=${runtimeInfo.agentId}` : "",
+    runtimeInfo?.persona ? `persona=${runtimeInfo.persona}` : "",
     runtimeInfo?.host ? `host=${runtimeInfo.host}` : "",
     runtimeInfo?.repoRoot ? `repo=${runtimeInfo.repoRoot}` : "",
     runtimeInfo?.os

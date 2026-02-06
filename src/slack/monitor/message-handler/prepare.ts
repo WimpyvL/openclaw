@@ -191,6 +191,7 @@ export async function prepareSlackMessage(params: {
       kind: isDirectMessage ? "dm" : isRoom ? "channel" : "group",
       id: isDirectMessage ? (message.user ?? "unknown") : message.channel,
     },
+    inboundText: message.text ?? "",
   });
 
   const baseSessionKey = route.sessionKey;
