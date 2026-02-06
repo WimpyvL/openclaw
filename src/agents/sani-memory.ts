@@ -12,6 +12,7 @@ const MEMORY_SOURCE_DIRS = [THREADBORN_DIR, BRIDGETHREAD_DIR, LABYRINTH_DIR] as 
 const SAFE_NAME_PATTERN = /[^a-z0-9._-]+/gi;
 const MAX_SLUG_LENGTH = 60;
 const FRONT_MATTER_DELIMITER = "---";
+const SESSION_LOGS_DIR = "sessions";
 
 type MemoryType = "ThreadBorn" | "BridgeThread" | "Vault" | "Labyrinth";
 
@@ -262,6 +263,57 @@ function resolveThreadbornDir(workspaceDir: string, folder?: string): string {
   return resolved;
 }
 
+function formatYamlList(values: string[]): string[] {
+  return values.map((value) => `  - ${formatYamlValue(value)}`);
+}
+
+function formatSessionDay(date: Date = new Date()): string {
+  return date.toISOString().slice(0, 10);
+}
+
+function resolveThreadbornSessionsDir(workspaceDir: string, date: Date): string {
+  return path.join(resolveThreadbornDir(workspaceDir), SESSION_LOGS_DIR, formatSessionDay(date));
+}
+
+function buildSessionLogFrontMatter(params: {
+  userCommand: string;
+  toolInvoked: string;
+  resultSummary: string;
+  promotionRecommendation: boolean;
+  tags?: string[];
+}): string {
+  const lines = [
+    FRONT_MATTER_DELIMITER,
+    `user_command: ${formatYamlValue(params.userCommand)}`,
+    `tool_invoked: ${formatYamlValue(params.toolInvoked)}`,
+    `result_summary: ${formatYamlValue(params.resultSummary)}`,
+    `promotion_recommendation: ${formatYamlValue(params.promotionRecommendation)}`,
+  ];
+  const tags =
+    params.tags
+      ?.filter(Boolean)
+      .map((tag) => tag.trim())
+      .filter(Boolean) ?? [];
+  if (tags.length > 0) {
+    lines.push("tags:", ...formatYamlList(tags));
+  }
+  lines.push(FRONT_MATTER_DELIMITER, "");
+  return lines.join("\n");
+}
+
+function summarizeResult(result: string): string {
+  const trimmed = result.trim();
+  if (!trimmed) {
+    return "No result.";
+  }
+  const firstLine = trimmed.split(/\r?\n/)[0] ?? trimmed;
+  const maxLength = 140;
+  if (firstLine.length > maxLength) {
+    return `${firstLine.slice(0, maxLength - 1)}…`;
+  }
+  return firstLine;
+}
+
 async function writeUniqueFile(params: {
   dir: string;
   filenameBase: string;
@@ -455,9 +507,55 @@ export async function writeLabyrinthSnapshot(params: {
   return await writeUniqueFile({ dir, filenameBase, content, allowSuffix: false });
 }
 
+export async function writeSessionLogEntry(params: {
+  workspaceDir: string;
+  userCommand: string;
+  toolInvoked?: string;
+  result: string;
+  recommend?: boolean;
+  tags?: string[];
+}): Promise<MemoryWriteResult> {
+  const now = new Date();
+  const toolInvoked = params.toolInvoked?.trim() || "none";
+  const userCommand = params.userCommand.trim() || "(empty)";
+  const result = params.result.trim() || "(no result)";
+  const recommendation = params.recommend === true;
+  const filenameBase = `${timestampSlug(now)}-${toSafeSlug(userCommand)}`;
+  const resultSummary = summarizeResult(result);
+  const content = [
+    buildSessionLogFrontMatter({
+      userCommand,
+      toolInvoked,
+      resultSummary,
+      promotionRecommendation: recommendation,
+      tags: params.tags,
+    }),
+    "# Session Log",
+    "",
+    `- Timestamp: ${now.toISOString()}`,
+    `- SessionDate: ${formatSessionDay(now)}`,
+    `- ToolInvoked: ${toolInvoked}`,
+    "",
+    "## User Command",
+    userCommand,
+    "",
+    "## Result Summary",
+    resultSummary,
+    "",
+    "## Result",
+    result,
+    "",
+    recommendation ? "- PromotionRecommendation: true" : "- PromotionRecommendation: false",
+    "",
+  ].join("\n");
+  const dir = resolveThreadbornSessionsDir(params.workspaceDir, now);
+  return await writeUniqueFile({ dir, filenameBase, content });
+}
+
 export const SANI_MEMORY_DIRS = {
   vault: VAULT_DIR,
   threadborn: THREADBORN_DIR,
   bridgeThread: BRIDGETHREAD_DIR,
   labyrinth: LABYRINTH_DIR,
+  threadbornSessions: path.join(THREADBORN_DIR, SESSION_LOGS_DIR),
 } as const;

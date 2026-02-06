@@ -11,12 +11,13 @@ import {
   resolveAllowedMemorySourcePath,
   writeBridgeThreadEntry,
   writeLabyrinthSnapshot,
+  writeSessionLogEntry,
   writeThreadbornEntry,
   writeVaultEntry,
 } from "../sani-memory.js";
 import { resolveSaniVaultSealingEnabled } from "../sani.js";
 import { stringEnum } from "../schema/typebox.js";
-import { jsonResult, readStringParam } from "./common.js";
+import { jsonResult, readStringArrayParam, readStringParam } from "./common.js";
 
 const ThreadbornWriteSchema = Type.Object({
   title: Type.String(),
@@ -52,6 +53,14 @@ const LabyrinthSnapshotSchema = Type.Object({
   body: Type.String(),
   source_session_id: Type.String(),
   source_trigger: Type.String(),
+});
+
+const SessionLogEntrySchema = Type.Object({
+  input: Type.String(),
+  tool_name: Type.Optional(Type.String()),
+  result: Type.String(),
+  recommend: Type.Optional(Type.Boolean()),
+  tags: Type.Optional(Type.Array(Type.String())),
 });
 
 const VAULT_QUERY_SCOPES = ["identity", "decisions", "history"] as const;
@@ -445,6 +454,42 @@ export function createVaultQueryTool(options: { workspaceDir?: string }): AnyAge
         });
       }
       return jsonResult({ scope, results });
+    },
+  };
+}
+
+export function createSessionLogEntryTool(options: { workspaceDir?: string }): AnyAgentTool | null {
+  if (!options.workspaceDir) {
+    return null;
+  }
+  return {
+    label: "Session Log Entry",
+    name: "session_log_entry",
+    description:
+      "Write a session journaling entry with intent/result into memory/ThreadBorn/sessions/YYYY-MM-DD/.",
+    parameters: SessionLogEntrySchema,
+    execute: async (_toolCallId, params) => {
+      const workspaceDir = requireWorkspaceDir(options.workspaceDir);
+      const input = readStringParam(params, "input", { required: true });
+      const toolName = readStringParam(params, "tool_name");
+      const result = readStringParam(params, "result", { required: true });
+      const recommend =
+        typeof (params as { recommend?: unknown }).recommend === "boolean"
+          ? (params as { recommend?: boolean }).recommend
+          : undefined;
+      const tags = readStringArrayParam(params, "tags");
+      const entry = await writeSessionLogEntry({
+        workspaceDir,
+        userCommand: input,
+        toolInvoked: toolName,
+        result,
+        recommend,
+        tags,
+      });
+      return jsonResult({
+        path: formatPathOutput(workspaceDir, entry.path),
+        filename: entry.filename,
+      });
     },
   };
 }
