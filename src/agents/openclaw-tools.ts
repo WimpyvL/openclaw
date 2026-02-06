@@ -12,6 +12,7 @@ import { createImageTool } from "./tools/image-tool.js";
 import {
   createBridgePromoteTool,
   createLabyrinthSnapshotTool,
+  createSessionLogEntryTool,
   createThreadbornWriteTool,
   createVaultQueryTool,
   createVaultSealTool,
@@ -165,6 +166,7 @@ export function createOpenClawTools(options?: {
           }),
           createVaultQueryTool({ workspaceDir: options.workspaceDir }),
           createLabyrinthSnapshotTool({ workspaceDir: options.workspaceDir }),
+          createSessionLogEntryTool({ workspaceDir: options.workspaceDir }),
         ].filter((tool): tool is AnyAgentTool => Boolean(tool))
       : []),
     ...(webSearchTool ? [webSearchTool] : []),

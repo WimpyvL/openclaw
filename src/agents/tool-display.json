@@ -291,6 +291,11 @@
       "title": "ThreadBorn Write",
       "detailKeys": ["title", "tags", "folder"]
     },
+    "session_log_entry": {
+      "emoji": "🧾",
+      "title": "Session Log Entry",
+      "detailKeys": ["input", "tool_name", "recommend", "tags"]
+    },
     "bridge_promote": {
       "emoji": "🧭",
       "title": "Bridge Promote",
