@@ -20,6 +20,16 @@ export function resolveSaniEnabled(
   return cfg?.agents?.defaults?.sani?.enabled === true;
 }
 
+export function resolveSaniVaultSealingEnabled(
+  cfg?: OpenClawConfig,
+  env: NodeJS.ProcessEnv = process.env,
+): boolean {
+  if (typeof env.SANI_VAULT_SEALING_ENABLED === "string") {
+    return isTruthyEnvValue(env.SANI_VAULT_SEALING_ENABLED);
+  }
+  return cfg?.agents?.defaults?.sani?.vaultSealingEnabled === true;
+}
+
 const DEFAULT_SANI_MODE_TTL_MINUTES = 720;
 
 function resolveSaniModeTtlMs(config?: OpenClawConfig): number | null {

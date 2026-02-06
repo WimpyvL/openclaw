@@ -137,6 +137,8 @@ export const AgentDefaultsSchema = z
     sani: z
       .object({
         enabled: z.boolean().optional(),
+        modeTtlMinutes: z.number().int().nonnegative().optional(),
+        vaultSealingEnabled: z.boolean().optional(),
       })
       .strict()
       .optional(),

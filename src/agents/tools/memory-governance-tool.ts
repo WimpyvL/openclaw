@@ -14,6 +14,7 @@ import {
   writeThreadbornEntry,
   writeVaultEntry,
 } from "../sani-memory.js";
+import { resolveSaniVaultSealingEnabled } from "../sani.js";
 import { stringEnum } from "../schema/typebox.js";
 import { jsonResult, readStringParam } from "./common.js";
 
@@ -69,6 +70,41 @@ function requireWorkspaceDir(workspaceDir?: string): string {
 
 function formatPathOutput(workspaceDir: string, filePath: string) {
   return path.relative(workspaceDir, filePath).replace(/\\/g, "/");
+}
+
+async function logVaultSealDenied(params: {
+  workspaceDir: string;
+  source: string;
+  title?: string;
+  append?: boolean;
+  targetPath?: string;
+  sourceSessionId: string;
+  sourceTrigger: string;
+}): Promise<void> {
+  const appendState = params.append === true ? "true" : params.append === false ? "false" : "unset";
+  const body = [
+    `- Timestamp: ${new Date().toISOString()}`,
+    `- SourceFile: ${params.source}`,
+    params.title ? `- Title: ${params.title}` : "",
+    `- Append: ${appendState}`,
+    params.targetPath ? `- TargetFile: ${params.targetPath}` : "",
+    `- SourceSessionId: ${params.sourceSessionId}`,
+    `- SourceTrigger: ${params.sourceTrigger}`,
+    "",
+    "Vault sealing request denied (SANI_VAULT_SEALING_ENABLED is disabled).",
+    "",
+  ]
+    .filter(Boolean)
+    .join("\n");
+  await writeThreadbornEntry({
+    workspaceDir: params.workspaceDir,
+    title: "Vault Seal Denied",
+    body,
+    tags: ["vault:denied", "admin-denied"],
+    folder: "admin-denied",
+    sourceSessionId: params.sourceSessionId,
+    sourceTrigger: params.sourceTrigger,
+  });
 }
 
 const VAULT_PREVIEW_LINES = 4;
@@ -294,8 +330,29 @@ export function createVaultSealTool(options: {
       const workspaceDir = requireWorkspaceDir(options.workspaceDir);
       const source = readStringParam(params, "source_file", { required: true });
       const title = readStringParam(params, "title");
-      readStringParam(params, "source_session_id", { required: true });
-      readStringParam(params, "source_trigger", { required: true });
+      const sourceSessionId = readStringParam(params, "source_session_id", { required: true });
+      const sourceTrigger = readStringParam(params, "source_trigger", { required: true });
+      const append =
+        typeof (params as { append?: unknown }).append === "boolean"
+          ? (params as { append?: boolean }).append
+          : undefined;
+      const targetPath = readStringParam(params, "target_file");
+      if (!resolveSaniVaultSealingEnabled(options.config)) {
+        try {
+          await logVaultSealDenied({
+            workspaceDir,
+            source,
+            title: title || undefined,
+            append,
+            targetPath: targetPath || undefined,
+            sourceSessionId,
+            sourceTrigger,
+          });
+        } catch {
+          // Best-effort logging; denial should still be explicit.
+        }
+        throw new Error("vault_seal is disabled (SANI_VAULT_SEALING_ENABLED=false).");
+      }
       try {
         resolveAllowedMemorySourcePath(workspaceDir, source);
       } catch {
@@ -308,11 +365,6 @@ export function createVaultSealTool(options: {
         sessionKey: options.sessionKey,
         toolName: "vault_seal",
       });
-      const append =
-        typeof (params as { append?: unknown }).append === "boolean"
-          ? (params as { append?: boolean }).append
-          : undefined;
-      const targetPath = readStringParam(params, "target_file");
       const result = await writeVaultEntry({
         workspaceDir,
         sourcePath: source,

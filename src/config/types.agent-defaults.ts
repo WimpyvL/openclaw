@@ -200,6 +200,8 @@ export type AgentDefaultsConfig = {
     enabled?: boolean;
     /** TTL for SANI/Labyrinth modes (minutes). Default: 720 (12 hours). */
     modeTtlMinutes?: number;
+    /** Enable vault sealing for SANI tools (default: false). */
+    vaultSealingEnabled?: boolean;
   };
   /** Max concurrent agent runs across all conversations. Default: 1 (sequential). */
   maxConcurrent?: number;

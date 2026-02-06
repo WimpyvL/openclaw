@@ -226,6 +226,7 @@ const FIELD_LABELS: Record<string, string> = {
   "agents.defaults.sani": "SANI",
   "agents.defaults.sani.enabled": "Enable SANI",
   "agents.defaults.sani.modeTtlMinutes": "SANI Mode TTL (min)",
+  "agents.defaults.sani.vaultSealingEnabled": "SANI Vault Sealing",
   "agents.defaults.memorySearch": "Memory Search",
   "agents.defaults.memorySearch.enabled": "Enable Memory Search",
   "agents.defaults.memorySearch.sources": "Memory Search Sources",
@@ -543,6 +544,8 @@ const FIELD_HELP: Record<string, string> = {
   "agents.defaults.sani.enabled": "Enable SANI identity + trigger handling (default: false).",
   "agents.defaults.sani.modeTtlMinutes":
     "TTL for SANI/Labyrinth mode flags before auto-clear (minutes, default: 720).",
+  "agents.defaults.sani.vaultSealingEnabled":
+    "Allow vault_seal tool writes (default: false; can be overridden by SANI_VAULT_SEALING_ENABLED env).",
   "agents.defaults.models": "Configured model catalog (keys are full provider/model IDs).",
   "agents.defaults.memorySearch":
     "Vector search over MEMORY.md and memory/*.md (per-agent overrides supported).",
