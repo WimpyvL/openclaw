@@ -17,6 +17,39 @@ describe("resolveAgentRoute", () => {
     expect(route.matchedBy).toBe("default");
   });
 
+  test("sani tag override routes to tagged agent when configured", () => {
+    const cfg: OpenClawConfig = {
+      agents: {
+        list: [{ id: "sani-core", default: true }, { id: "sani-work" }, { id: "sani-home" }],
+      },
+    };
+    const route = resolveAgentRoute({
+      cfg,
+      channel: "whatsapp",
+      accountId: null,
+      inboundText: "Need this now #core thanks",
+      peer: { kind: "dm", id: "+15551234567" },
+    });
+    expect(route.agentId).toBe("sani-core");
+    expect(route.matchedBy).toBe("sani.tag");
+  });
+
+  test("sani channel routing uses configured agent defaults", () => {
+    const cfg: OpenClawConfig = {
+      agents: {
+        list: [{ id: "sani-core", default: true }, { id: "sani-work" }, { id: "sani-home" }],
+      },
+    };
+    const route = resolveAgentRoute({
+      cfg,
+      channel: "telegram",
+      accountId: null,
+      peer: { kind: "dm", id: "123" },
+    });
+    expect(route.agentId).toBe("sani-core");
+    expect(route.matchedBy).toBe("sani.channel");
+  });
+
   test("dmScope=per-peer isolates DM sessions by sender id", () => {
     const cfg: OpenClawConfig = {
       session: { dmScope: "per-peer" },

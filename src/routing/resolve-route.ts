@@ -1,5 +1,6 @@
 import type { OpenClawConfig } from "../config/config.js";
 import { resolveDefaultAgentId } from "../agents/agent-scope.js";
+import { resolveSaniRouteHint } from "../agents/routing.js";
 import { listBindings } from "./bindings.js";
 import {
   buildAgentMainSessionKey,
@@ -22,6 +23,7 @@ export type ResolveAgentRouteInput = {
   channel: string;
   accountId?: string | null;
   peer?: RoutePeer | null;
+  inboundText?: string | null;
   /** Parent peer for threads — used for binding inheritance when peer doesn't match directly. */
   parentPeer?: RoutePeer | null;
   guildId?: string | null;
@@ -44,6 +46,8 @@ export type ResolvedAgentRoute = {
     | "binding.team"
     | "binding.account"
     | "binding.channel"
+    | "sani.tag"
+    | "sani.channel"
     | "default";
 };
 
@@ -170,6 +174,8 @@ export function resolveAgentRoute(input: ResolveAgentRouteInput): ResolvedAgentR
   const peer = input.peer ? { kind: input.peer.kind, id: normalizeId(input.peer.id) } : null;
   const guildId = normalizeId(input.guildId);
   const teamId = normalizeId(input.teamId);
+  const inboundText = input.inboundText;
+  const agentIds = new Set(listAgents(input.cfg).map((agent) => normalizeAgentId(agent.id)));
 
   const bindings = listBindings(input.cfg).filter((binding) => {
     if (!binding || typeof binding !== "object") {
@@ -207,6 +213,15 @@ export function resolveAgentRoute(input: ResolveAgentRouteInput): ResolvedAgentR
       matchedBy,
     };
   };
+
+  const saniHint = resolveSaniRouteHint({
+    channel,
+    accountId,
+    inboundText,
+  });
+  if (saniHint?.source === "tag" && agentIds.has(normalizeAgentId(saniHint.agentId))) {
+    return choose(saniHint.agentId, "sani.tag");
+  }
 
   if (peer) {
     const peerMatch = bindings.find((b) => matchesPeer(b.match, peer));
@@ -254,6 +269,10 @@ export function resolveAgentRoute(input: ResolveAgentRouteInput): ResolvedAgentR
   );
   if (anyAccountMatch) {
     return choose(anyAccountMatch.agentId, "binding.channel");
+  }
+
+  if (saniHint?.source === "channel" && agentIds.has(normalizeAgentId(saniHint.agentId))) {
+    return choose(saniHint.agentId, "sani.channel");
   }
 
   return choose(resolveDefaultAgentId(input.cfg), "default");

@@ -17,10 +17,13 @@ export type AgentModelConfig =
       fallbacks?: string[];
     };
 
+export type AgentPersona = "core" | "work" | "home";
+
 export type AgentConfig = {
   id: string;
   default?: boolean;
   name?: string;
+  persona?: AgentPersona;
   workspace?: string;
   agentDir?: string;
   model?: AgentModelConfig;

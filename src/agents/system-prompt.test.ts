@@ -370,6 +370,7 @@ describe("buildAgentSystemPrompt", () => {
     const line = buildRuntimeLine(
       {
         agentId: "work",
+        persona: "work",
         host: "host",
         repoRoot: "/repo",
         os: "macOS",
@@ -384,6 +385,7 @@ describe("buildAgentSystemPrompt", () => {
     );
 
     expect(line).toContain("agent=work");
+    expect(line).toContain("persona=work");
     expect(line).toContain("host=host");
     expect(line).toContain("repo=/repo");
     expect(line).toContain("os=macOS (arm64)");

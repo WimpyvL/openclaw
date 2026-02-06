@@ -8,7 +8,7 @@ import { isTruthyEnvValue } from "../infra/env.js";
 import { createSubsystemLogger } from "../logging/subsystem.js";
 import { runCommandWithTimeout } from "../process/exec.js";
 import { resolveUserPath } from "../utils.js";
-import { resolveSessionAgentIds } from "./agent-scope.js";
+import { resolveAgentDir, resolveSessionAgentIds } from "./agent-scope.js";
 import { makeBootstrapWarn, resolveBootstrapContextForRun } from "./bootstrap-files.js";
 import { resolveCliBackendConfig } from "./cli-backends.js";
 import {
@@ -30,6 +30,7 @@ import { resolveOpenClawDocsPath } from "./docs-path.js";
 import { FailoverError, resolveFailoverStatus } from "./failover-error.js";
 import { classifyFailoverReason, isFailoverErrorMessage } from "./pi-embedded-helpers.js";
 import { readSaniSessionFlags, resolveSaniEnabled } from "./sani.js";
+import { loadSystemPromptFragment, mergeSystemPromptFragments } from "./system-prompt-fragment.js";
 
 const log = createSubsystemLogger("agent/claude-cli");
 
@@ -64,13 +65,6 @@ export async function runCliAgent(params: {
   const normalizedModel = normalizeCliModel(modelId, backend);
   const modelDisplay = `${params.provider}/${modelId}`;
 
-  const extraSystemPrompt = [
-    params.extraSystemPrompt?.trim(),
-    "Tools are disabled in this session. Do not call tools.",
-  ]
-    .filter(Boolean)
-    .join("\n");
-
   const sessionLabel = params.sessionKey ?? params.sessionId;
   const { contextFiles } = await resolveBootstrapContextForRun({
     workspaceDir,
@@ -83,6 +77,13 @@ export async function runCliAgent(params: {
     sessionKey: params.sessionKey,
     config: params.config,
   });
+  const agentDir = resolveAgentDir(params.config ?? {}, sessionAgentId);
+  const systemPromptFragment = await loadSystemPromptFragment({ agentDir });
+  const extraSystemPrompt = mergeSystemPromptFragments(
+    params.extraSystemPrompt,
+    systemPromptFragment,
+    "Tools are disabled in this session. Do not call tools.",
+  );
   const heartbeatPrompt =
     sessionAgentId === defaultAgentId
       ? resolveHeartbeatPrompt(params.config?.agents?.defaults?.heartbeat?.prompt)

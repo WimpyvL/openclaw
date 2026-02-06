@@ -28,6 +28,7 @@ export function buildEmbeddedSystemPrompt(params: {
   promptMode?: PromptMode;
   runtimeInfo: {
     agentId?: string;
+    persona?: string;
     host: string;
     os: string;
     arch: string;
