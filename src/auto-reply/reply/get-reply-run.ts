@@ -24,6 +24,7 @@ import { logVerbose } from "../../globals.js";
 import { clearCommandLane, getQueueSize } from "../../process/command-queue.js";
 import { normalizeMainKey } from "../../routing/session-key.js";
 import { wrapInboundMessage } from "../../security/inbound-message.js";
+import { detectInjectionPatterns, logInjectionAttempt } from "../../security/injection-audit.js";
 import { isReasoningTagProvider } from "../../utils/provider-utils.js";
 import { hasControlCommand } from "../command-detection.js";
 import { buildInboundMediaNote } from "../media-note.js";
@@ -210,8 +211,19 @@ export async function runPreparedReply(
       text: "I didn't receive any text in your message. Please resend or add a caption.",
     };
   }
+  const inboundChannel = ctx.OriginatingChannel ?? sessionCtx.Provider ?? "unknown";
+  const injectionMatches = detectInjectionPatterns(baseBodyFinal, {
+    channel: inboundChannel,
+  });
+  await logInjectionAttempt({
+    workspaceDir,
+    sessionKey,
+    channel: inboundChannel,
+    rawInput: baseBodyFinal,
+    matches: injectionMatches,
+  });
   const wrappedInbound = wrapInboundMessage(baseBodyFinal, {
-    source: ctx.OriginatingChannel ?? sessionCtx.Provider ?? "unknown",
+    source: inboundChannel,
     senderId: sessionCtx.SenderId?.trim(),
     senderName: sessionCtx.SenderName?.trim(),
     senderUsername: sessionCtx.SenderUsername?.trim(),
