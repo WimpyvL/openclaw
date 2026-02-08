@@ -276,6 +276,7 @@ function resolveThreadbornSessionsDir(workspaceDir: string, date: Date): string 
 }
 
 function buildSessionLogFrontMatter(params: {
+  timestamp: string;
   userCommand: string;
   toolInvoked: string;
   resultSummary: string;
@@ -284,6 +285,7 @@ function buildSessionLogFrontMatter(params: {
 }): string {
   const lines = [
     FRONT_MATTER_DELIMITER,
+    `timestamp: ${formatYamlValue(params.timestamp)}`,
     `user_command: ${formatYamlValue(params.userCommand)}`,
     `tool_invoked: ${formatYamlValue(params.toolInvoked)}`,
     `result_summary: ${formatYamlValue(params.resultSummary)}`,
@@ -296,6 +298,8 @@ function buildSessionLogFrontMatter(params: {
       .filter(Boolean) ?? [];
   if (tags.length > 0) {
     lines.push("tags:", ...formatYamlList(tags));
+  } else {
+    lines.push("tags: []");
   }
   lines.push(FRONT_MATTER_DELIMITER, "");
   return lines.join("\n");
@@ -516,6 +520,7 @@ export async function writeSessionLogEntry(params: {
   tags?: string[];
 }): Promise<MemoryWriteResult> {
   const now = new Date();
+  const timestamp = now.toISOString();
   const toolInvoked = params.toolInvoked?.trim() || "none";
   const userCommand = params.userCommand.trim() || "(empty)";
   const result = params.result.trim() || "(no result)";
@@ -524,6 +529,7 @@ export async function writeSessionLogEntry(params: {
   const resultSummary = summarizeResult(result);
   const content = [
     buildSessionLogFrontMatter({
+      timestamp,
       userCommand,
       toolInvoked,
       resultSummary,
@@ -532,7 +538,7 @@ export async function writeSessionLogEntry(params: {
     }),
     "# Session Log",
     "",
-    `- Timestamp: ${now.toISOString()}`,
+    `- Timestamp: ${timestamp}`,
     `- SessionDate: ${formatSessionDay(now)}`,
     `- ToolInvoked: ${toolInvoked}`,
     "",
