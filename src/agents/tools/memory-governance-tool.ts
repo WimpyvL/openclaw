@@ -242,16 +242,37 @@ function resolveToolProvenance(params: {
   };
 }
 
+function resolveVaultQuerySessionId(params: {
+  config?: OpenClawConfig;
+  sessionKey?: string;
+}): string {
+  const sessionKey = params.sessionKey?.trim();
+  if (!params.config || !sessionKey) {
+    throw new Error("vault_query requires active session context for provenance.");
+  }
+  const agentId = resolveSessionAgentId({ sessionKey, config: params.config });
+  const storePath = resolveStorePath(params.config.session?.store, { agentId });
+  const store = loadSessionStore(storePath);
+  const entry = store[sessionKey];
+  if (!entry?.sessionId) {
+    throw new Error("vault_query could not resolve session provenance.");
+  }
+  return entry.sessionId;
+}
+
 function formatVaultAccessFilename(date: Date): string {
-  const stamp = date.toISOString().slice(0, 16).replace("T", "-").replace(":", "");
-  return `${stamp}.md`;
+  const iso = date.toISOString();
+  const day = iso.slice(0, 10);
+  const time = iso.slice(11, 16).replace(":", "");
+  return `${day}-${time}.md`;
 }
 
 async function writeVaultAccessLog(params: {
   workspaceDir: string;
   scope: string;
   tags?: string[];
-  results: Array<{ title: string; date: string }>;
+  sessionId: string;
+  results: Array<{ title: string; created_at: string }>;
 }): Promise<string> {
   const now = new Date();
   const dir = path.join(params.workspaceDir, "memory", "ThreadBorn", VAULT_ACCESS_FOLDER);
@@ -268,6 +289,7 @@ async function writeVaultAccessLog(params: {
   const lines = [
     `${prefix}# Vault Query`,
     `- Timestamp: ${now.toISOString()}`,
+    `- SessionId: ${params.sessionId}`,
     `- Scope: ${params.scope}`,
     `- Tags: ${params.tags?.length ? params.tags.join(", ") : "none"}`,
     `- Results: ${params.results.length}`,
@@ -278,7 +300,7 @@ async function writeVaultAccessLog(params: {
     lines.push("- None");
   } else {
     for (const entry of params.results) {
-      lines.push(`- ${entry.title} (${entry.date})`);
+      lines.push(`- ${entry.title} (${entry.created_at})`);
     }
   }
   lines.push("");
@@ -472,7 +494,11 @@ export function createLabyrinthSnapshotTool(options: {
   };
 }
 
-export function createVaultQueryTool(options: { workspaceDir?: string }): AnyAgentTool | null {
+export function createVaultQueryTool(options: {
+  workspaceDir?: string;
+  config?: OpenClawConfig;
+  sessionKey?: string;
+}): AnyAgentTool | null {
   if (!options.workspaceDir) {
     return null;
   }
@@ -487,9 +513,13 @@ export function createVaultQueryTool(options: { workspaceDir?: string }): AnyAge
       const tags = Array.isArray((params as { tags?: unknown }).tags)
         ? (params as { tags?: string[] }).tags
         : undefined;
+      const sessionId = resolveVaultQuerySessionId({
+        config: options.config,
+        sessionKey: options.sessionKey,
+      });
       const vaultDir = path.join(workspaceDir, "memory", "Vault");
       const files = await listMarkdownFiles(vaultDir);
-      const results: Array<{ title: string; date: string; preview: string }> = [];
+      const results: Array<{ title: string; created_at: string; preview: string }> = [];
       const scopePrefix = `${scope}${path.sep}`;
       for (const filePath of files) {
         const relative = path.relative(vaultDir, filePath);
@@ -505,10 +535,10 @@ export function createVaultQueryTool(options: { workspaceDir?: string }): AnyAge
         }
         const stats = await fs.stat(filePath);
         const { title, preview } = extractTitleAndPreview(content);
-        const date = extractFrontMatterDate(content) ?? stats.mtime.toISOString();
+        const createdAt = extractFrontMatterDate(content) ?? stats.mtime.toISOString();
         results.push({
           title,
-          date,
+          created_at: createdAt,
           preview,
         });
       }
@@ -516,7 +546,11 @@ export function createVaultQueryTool(options: { workspaceDir?: string }): AnyAge
         workspaceDir,
         scope,
         tags,
-        results: results.map((entry) => ({ title: entry.title, date: entry.date })),
+        sessionId,
+        results: results.map((entry) => ({
+          title: entry.title,
+          created_at: entry.created_at,
+        })),
       });
       return jsonResult({ scope, results });
     },
