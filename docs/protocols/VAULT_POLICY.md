@@ -1,37 +1,23 @@
-# Vault Policy
+# Vault policy
 
-## Purpose
+## Eligibility criteria
 
-The Vault is for irreversible, identity-level milestones that must remain sealed and auditable. Vault entries are append-only and never edited after sealing.
+- Vault entries must originate from approved memory sources.
+- Only material that requires durable retention should be sealed.
+- Entries must be attributable to a specific session and trigger.
 
-## Qualifying events
+## Local user promotion only
 
-Vault sealing is reserved for:
+- Vault entries are sealed only by an explicit local user action.
+- Automated or remote promotions are not allowed.
 
-- Identity events (core identity shifts, bindings, or commitments).
-- Revelations that permanently change the system or user relationship.
-- Irreversible transformations that cannot be safely rolled back.
-
-## Promotion authority
-
-- Only the local user can promote content into the Vault.
-- No automated agent or scheduled process may seal entries.
-
-## When sealing is allowed
-
-- Sealing is allowed only by explicit manual intent.
-- Automatic triggers or background tasks must never seal Vault entries.
-
-## Allowed source memory types
-
-Vault entries may be sealed only from:
+## Allowed types
 
 - ThreadBorn
 - BridgeThread
 - Labyrinth
 
-## Write only guarantee
+## Sealed entry immutability
 
-- The Vault is write-only and append-only.
-- Never edit or delete Vault entries.
-- New information must be appended by explicit command.
+- Sealed entries are immutable.
+- Never edit or overwrite a sealed entry.

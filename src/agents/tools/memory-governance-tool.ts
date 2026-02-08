@@ -116,25 +116,8 @@ async function logVaultSealDenied(params: {
   });
 }
 
-const VAULT_PREVIEW_LINES = 4;
-
-async function resolveVaultScopeDir(workspaceDir: string, scope: string): Promise<string> {
-  const vaultDir = path.join(workspaceDir, "memory", "Vault");
-  const scopedDir = path.join(vaultDir, scope);
-  if (await isDirectory(scopedDir)) {
-    return scopedDir;
-  }
-  return vaultDir;
-}
-
-async function isDirectory(dirPath: string): Promise<boolean> {
-  try {
-    const stats = await fs.stat(dirPath);
-    return stats.isDirectory();
-  } catch {
-    return false;
-  }
-}
+const VAULT_PREVIEW_LINES = 3;
+const VAULT_ACCESS_FOLDER = "vault_access";
 
 async function listMarkdownFiles(dirPath: string): Promise<string[]> {
   let entries: Dirent[];
@@ -207,6 +190,37 @@ function extractTitleAndPreview(content: string): { title: string; preview: stri
   };
 }
 
+function extractFrontMatterDate(content: string): string | undefined {
+  const lines = content.split(/\r?\n/);
+  if (lines[0] !== "---") {
+    return undefined;
+  }
+  for (let i = 1; i < lines.length; i += 1) {
+    const line = lines[i]?.trim();
+    if (!line) {
+      continue;
+    }
+    if (line === "---") {
+      break;
+    }
+    const match = line.match(/^created_at:\s*(.+)$/);
+    if (match) {
+      const value = match[1].trim();
+      if (!value) {
+        return undefined;
+      }
+      if (
+        (value.startsWith('"') && value.endsWith('"')) ||
+        (value.startsWith("'") && value.endsWith("'"))
+      ) {
+        return value.slice(1, -1);
+      }
+      return value;
+    }
+  }
+  return undefined;
+}
+
 function matchesTags(content: string, tags?: string[]): boolean {
   if (!tags || tags.length === 0) {
     return true;
@@ -235,6 +249,50 @@ function resolveToolProvenance(params: {
     sourceSessionId: entry.sessionId,
     sourceTrigger: params.toolName.toUpperCase(),
   };
+}
+
+function formatVaultAccessFilename(date: Date): string {
+  const stamp = date.toISOString().slice(0, 16).replace("T", "-").replace(":", "");
+  return `${stamp}.md`;
+}
+
+async function writeVaultAccessLog(params: {
+  workspaceDir: string;
+  scope: string;
+  tags?: string[];
+  results: Array<{ title: string; date: string }>;
+}): Promise<string> {
+  const now = new Date();
+  const dir = path.join(params.workspaceDir, "memory", "ThreadBorn", VAULT_ACCESS_FOLDER);
+  await fs.mkdir(dir, { recursive: true });
+  const filename = formatVaultAccessFilename(now);
+  const filePath = path.join(dir, filename);
+  let prefix = "";
+  try {
+    await fs.access(filePath);
+    prefix = "\n---\n\n";
+  } catch {
+    // File does not exist yet.
+  }
+  const lines = [
+    `${prefix}# Vault Query`,
+    `- Timestamp: ${now.toISOString()}`,
+    `- Scope: ${params.scope}`,
+    `- Tags: ${params.tags?.length ? params.tags.join(", ") : "none"}`,
+    `- Results: ${params.results.length}`,
+    "",
+    "## Entries",
+  ];
+  if (params.results.length === 0) {
+    lines.push("- None");
+  } else {
+    for (const entry of params.results) {
+      lines.push(`- ${entry.title} (${entry.date})`);
+    }
+  }
+  lines.push("");
+  await fs.appendFile(filePath, lines.join("\n"), "utf-8");
+  return filePath;
 }
 
 export function createThreadbornWriteTool(options: { workspaceDir?: string }): AnyAgentTool | null {
@@ -440,21 +498,37 @@ export function createVaultQueryTool(options: { workspaceDir?: string }): AnyAge
       const tags = Array.isArray((params as { tags?: unknown }).tags)
         ? (params as { tags?: string[] }).tags
         : undefined;
-      const vaultDir = await resolveVaultScopeDir(workspaceDir, scope);
+      const vaultDir = path.join(workspaceDir, "memory", "Vault");
       const files = await listMarkdownFiles(vaultDir);
-      const results = [];
+      const results: Array<{ title: string; date: string; preview: string }> = [];
+      const scopePrefix = `${scope}${path.sep}`;
       for (const filePath of files) {
+        const relative = path.relative(vaultDir, filePath);
+        if (!relative || relative.startsWith("..") || path.isAbsolute(relative)) {
+          continue;
+        }
+        if (!relative.startsWith(scopePrefix)) {
+          continue;
+        }
         const content = await fs.readFile(filePath, "utf-8");
         if (!matchesTags(content, tags)) {
           continue;
         }
+        const stats = await fs.stat(filePath);
         const { title, preview } = extractTitleAndPreview(content);
+        const date = extractFrontMatterDate(content) ?? stats.mtime.toISOString();
         results.push({
-          path: formatPathOutput(workspaceDir, filePath),
           title,
+          date,
           preview,
         });
       }
+      await writeVaultAccessLog({
+        workspaceDir,
+        scope,
+        tags,
+        results: results.map((entry) => ({ title: entry.title, date: entry.date })),
+      });
       return jsonResult({ scope, results });
     },
   };
