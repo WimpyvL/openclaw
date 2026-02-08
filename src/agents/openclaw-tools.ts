@@ -164,7 +164,11 @@ export function createOpenClawTools(options?: {
             config: options?.config,
             sessionKey: options?.agentSessionKey,
           }),
-          createVaultQueryTool({ workspaceDir: options.workspaceDir }),
+          createVaultQueryTool({
+            workspaceDir: options.workspaceDir,
+            config: options?.config,
+            sessionKey: options?.agentSessionKey,
+          }),
           createLabyrinthSnapshotTool({ workspaceDir: options.workspaceDir }),
           createSessionLogEntryTool({ workspaceDir: options.workspaceDir }),
         ].filter((tool): tool is AnyAgentTool => Boolean(tool))
