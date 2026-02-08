@@ -1,6 +1,5 @@
 import fs from "node:fs/promises";
 import path from "node:path";
-import { writeThreadbornEntry } from "../src/agents/sani-memory.js";
 import {
   readConfigFileSnapshot,
   writeConfigFile,
@@ -75,23 +74,28 @@ async function logAdminOverride(params: {
   enabled: boolean;
   target: string;
 }): Promise<void> {
+  const now = new Date();
+  const timestamp = now.toISOString();
+  const dateStamp = timestamp.slice(0, 10);
+  const timeStamp = timestamp.slice(11, 16).replace(":", "");
+  const logDir = path.join(params.workspaceDir, "memory", "ThreadBorn", LOG_FOLDER, dateStamp);
+  await fs.mkdir(logDir, { recursive: true });
+
+  const user = process.env.USER ?? process.env.USERNAME ?? "unknown";
   const body = [
-    `- Timestamp: ${new Date().toISOString()}`,
-    `- Enabled: ${params.enabled ? "true" : "false"}`,
-    `- Target: ${params.target}`,
+    "# Vault Sealing Override",
     "",
-    "Vault sealing admin override updated.",
+    `- action: ${params.enabled ? "enabled" : "disabled"}`,
+    `- timestamp: ${timestamp}`,
+    `- user: ${user}`,
+    "- tags: vault:override, admin-override",
+    "",
+    `- target: ${params.target}`,
     "",
   ].join("\n");
-  await writeThreadbornEntry({
-    workspaceDir: params.workspaceDir,
-    title: "Vault Sealing Override",
-    body,
-    tags: ["vault:override", "admin-override"],
-    folder: LOG_FOLDER,
-    sourceSessionId: "admin-override",
-    sourceTrigger: "VAULT_SEALING_TOGGLE",
-  });
+
+  const logPath = path.join(logDir, `sealing-toggle-${timeStamp}.md`);
+  await fs.writeFile(logPath, body, "utf-8");
 }
 
 async function main() {
