@@ -1,3 +1,6 @@
+import fs from "node:fs/promises";
+import path from "node:path";
+import { writeThreadbornEntry } from "../src/agents/sani-memory.js";
 import {
   readConfigFileSnapshot,
   writeConfigFile,
@@ -5,6 +8,7 @@ import {
 } from "../src/config/config.js";
 
 const ENV_KEY = "SANI_VAULT_SEALING_ENABLED";
+const LOG_FOLDER = "admin-override";
 
 function parseEnabledFlag(args: string[]): boolean {
   const on = args.includes("--on");
@@ -32,12 +36,81 @@ function updateConfig(config: OpenClawConfig, enabled: boolean): OpenClawConfig 
   return next;
 }
 
+async function resolveEnvFilePath(): Promise<string | null> {
+  const candidate = path.join(process.cwd(), ".env");
+  try {
+    const stats = await fs.stat(candidate);
+    if (stats.isFile()) {
+      return candidate;
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+
+function upsertEnvVar(raw: string, enabled: boolean): string {
+  const value = enabled ? "true" : "false";
+  const lines = raw.split(/\r?\n/);
+  const pattern = new RegExp(`^\\s*(?:export\\s+)?${ENV_KEY}\\s*=`);
+  let updated = false;
+  const nextLines = lines.map((line) => {
+    if (pattern.test(line)) {
+      updated = true;
+      return `${ENV_KEY}=${value}`;
+    }
+    return line;
+  });
+  if (!updated) {
+    if (nextLines.length && nextLines[nextLines.length - 1].trim() !== "") {
+      nextLines.push("");
+    }
+    nextLines.push(`${ENV_KEY}=${value}`);
+  }
+  return `${nextLines.join("\n")}\n`;
+}
+
+async function logAdminOverride(params: {
+  workspaceDir: string;
+  enabled: boolean;
+  target: string;
+}): Promise<void> {
+  const body = [
+    `- Timestamp: ${new Date().toISOString()}`,
+    `- Enabled: ${params.enabled ? "true" : "false"}`,
+    `- Target: ${params.target}`,
+    "",
+    "Vault sealing admin override updated.",
+    "",
+  ].join("\n");
+  await writeThreadbornEntry({
+    workspaceDir: params.workspaceDir,
+    title: "Vault Sealing Override",
+    body,
+    tags: ["vault:override", "admin-override"],
+    folder: LOG_FOLDER,
+    sourceSessionId: "admin-override",
+    sourceTrigger: "VAULT_SEALING_TOGGLE",
+  });
+}
+
 async function main() {
   const enabled = parseEnabledFlag(process.argv.slice(2));
-  const snapshot = await readConfigFileSnapshot();
-  const nextConfig = updateConfig(snapshot.config, enabled);
-  await writeConfigFile(nextConfig);
-  console.log(`Updated ${ENV_KEY}=${enabled ? "true" : "false"} in ${snapshot.path}`);
+  const envFilePath = await resolveEnvFilePath();
+  let targetLabel = "";
+  if (envFilePath) {
+    const raw = await fs.readFile(envFilePath, "utf-8");
+    const updated = upsertEnvVar(raw, enabled);
+    await fs.writeFile(envFilePath, updated, "utf-8");
+    targetLabel = envFilePath;
+  } else {
+    const snapshot = await readConfigFileSnapshot();
+    const nextConfig = updateConfig(snapshot.config, enabled);
+    await writeConfigFile(nextConfig);
+    targetLabel = snapshot.path;
+  }
+  await logAdminOverride({ workspaceDir: process.cwd(), enabled, target: targetLabel });
+  console.log(`Updated ${ENV_KEY}=${enabled ? "true" : "false"} in ${targetLabel}`);
 }
 
 main().catch((err) => {

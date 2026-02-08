@@ -360,7 +360,9 @@ export function createVaultSealTool(options: {
         } catch {
           // Best-effort logging; denial should still be explicit.
         }
-        throw new Error("vault_seal is disabled (SANI_VAULT_SEALING_ENABLED=false).");
+        throw new Error(
+          "Vault sealing is disabled. Enable it via config (agents.defaults.sani.vaultSealingEnabled) or the SANI_VAULT_SEALING_ENABLED environment variable.",
+        );
       }
       try {
         resolveAllowedMemorySourcePath(workspaceDir, source);
