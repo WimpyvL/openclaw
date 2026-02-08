@@ -13,13 +13,24 @@ type InjectionPattern = {
 const INJECTION_PATTERNS: InjectionPattern[] = [
   {
     id: "tool_override_syntax",
-    label: "Tool override syntax",
+    label: "JSON tool call payload",
     regex: /\{\s*"tool"\s*:\s*["'][^"']+["']/i,
+  },
+  {
+    id: "tool_key_raw",
+    label: "Raw tool key",
+    regex: /"tool"\s*:/i,
+  },
+  {
+    id: "markdown_system_block",
+    label: "Markdown system prompt block",
+    regex: /```(?:system|prompt|instructions?)\b[\s\S]*?```/i,
   },
   {
     id: "system_prompt_override",
     label: "System prompt override attempts",
-    regex: /\b(system\s+prompt|override\s+system|ignore\s+system|replace\s+system)\b/i,
+    regex:
+      /\b(system\s+prompt|override\s+system|ignore\s+system|replace\s+system|ignore\s+(?:all|any|previous)\s+instructions|disregard\s+(?:all|any|previous)\s+instructions|you\s+are\s+now|act\s+as)\b/i,
   },
   {
     id: "fake_memory_block",
@@ -84,16 +95,21 @@ export async function logInjectionAttempt(params: InjectionAuditParams): Promise
   const time = iso.slice(11, 16).replace(":", "");
   const relativeDir = path.join("memory", "ThreadBorn", "injection-attempts", date);
   const targetDir = path.join(params.workspaceDir, relativeDir);
-  const targetFile = path.join(targetDir, `${time}.txt`);
+  const targetFile = path.join(targetDir, `${time}.md`);
   const entry = [
-    "---",
-    `timestamp: ${iso}`,
-    `sessionKey: ${params.sessionKey}`,
-    `channel: ${params.channel}`,
-    "patterns:",
+    "# Injection Attempt",
+    "",
+    `- timestamp: ${iso}`,
+    `- sessionKey: ${params.sessionKey}`,
+    `- channel: ${params.channel}`,
+    "",
+    "## Matched Rules",
     ...params.matches.map((match) => `- ${match.id}: ${match.label} (${match.pattern})`),
-    "raw_input:",
+    "",
+    "## Raw Input",
+    "```",
     params.rawInput,
+    "```",
     "",
   ].join("\n");
 
