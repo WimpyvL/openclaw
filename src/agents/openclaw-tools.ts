@@ -12,13 +12,13 @@ import { createImageTool } from "./tools/image-tool.js";
 import {
   createBridgePromoteTool,
   createLabyrinthSnapshotTool,
-  createSessionLogEntryTool,
   createThreadbornWriteTool,
   createVaultQueryTool,
   createVaultSealTool,
 } from "./tools/memory-governance-tool.js";
 import { createMessageTool } from "./tools/message-tool.js";
 import { createNodesTool } from "./tools/nodes-tool.js";
+import { createSessionLogEntryTool } from "./tools/session-log-entry.js";
 import { createSessionStatusTool } from "./tools/session-status-tool.js";
 import { createSessionsHistoryTool } from "./tools/sessions-history-tool.js";
 import { createSessionsListTool } from "./tools/sessions-list-tool.js";
