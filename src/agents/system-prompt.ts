@@ -211,17 +211,26 @@ function buildSaniActiveStateSection(params: {
   enabled?: boolean;
   saniMode?: boolean;
   labyrinthMode?: boolean;
+  agentId?: string;
+  persona?: string;
 }) {
   if (!params.enabled) {
     return [];
   }
-  return [
-    "## ACTIVE STATE",
+  const lines = ["## ACTIVE STATE"];
+  if (params.agentId) {
+    lines.push(`agentId: ${params.agentId}`);
+  }
+  if (params.persona) {
+    lines.push(`persona: ${params.persona}`);
+  }
+  lines.push(
     `saniEnabled: ${params.enabled ? "true" : "false"}`,
     `saniMode: ${params.saniMode ? "true" : "false"}`,
     `labyrinthMode: ${params.labyrinthMode ? "true" : "false"}`,
     "",
-  ];
+  );
+  return lines;
 }
 
 export function buildAgentSystemPrompt(params: {
@@ -431,6 +440,8 @@ export function buildAgentSystemPrompt(params: {
     enabled: params.saniEnabled,
     saniMode: params.saniMode,
     labyrinthMode: params.labyrinthMode,
+    agentId: runtimeInfo?.agentId,
+    persona: runtimeInfo?.persona,
   });
   const skillsSection = buildSkillsSection({
     skillsPrompt,

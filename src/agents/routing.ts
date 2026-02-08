@@ -19,7 +19,6 @@ const TAG_PATTERN = /(^|\s)#(core|work|home)(?=\s|$)/gi;
 
 export function resolveSaniRouteHint(params: {
   channel?: string | null;
-  accountId?: string | null;
   inboundText?: string | null;
 }): SaniRouteHint | undefined {
   const inbound = params.inboundText ?? "";
@@ -33,15 +32,13 @@ export function resolveSaniRouteHint(params: {
   }
 
   const channel = normalizeToken(params.channel);
-  const accountId = normalizeToken(params.accountId);
-  const isDefaultAccount = !accountId || accountId === "default";
   if (channel === "telegram") {
     return { agentId: SANI_AGENT_IDS.core, source: "channel" };
   }
-  if (channel === "slack" && (isDefaultAccount || accountId === "work")) {
+  if (channel === "slack") {
     return { agentId: SANI_AGENT_IDS.work, source: "channel" };
   }
-  if (channel === "whatsapp" && (isDefaultAccount || accountId === "home")) {
+  if (channel === "whatsapp") {
     return { agentId: SANI_AGENT_IDS.home, source: "channel" };
   }
   return undefined;
