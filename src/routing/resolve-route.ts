@@ -216,7 +216,6 @@ export function resolveAgentRoute(input: ResolveAgentRouteInput): ResolvedAgentR
 
   const saniHint = resolveSaniRouteHint({
     channel,
-    accountId,
     inboundText,
   });
   if (saniHint?.source === "tag" && agentIds.has(normalizeAgentId(saniHint.agentId))) {

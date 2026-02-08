@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vitest";
 import type { OpenClawConfig } from "../config/config.js";
+import { buildAgentSystemPrompt } from "../agents/system-prompt.js";
 import { resolveAgentRoute } from "./resolve-route.js";
 
 describe("resolveAgentRoute", () => {
@@ -48,6 +49,38 @@ describe("resolveAgentRoute", () => {
     });
     expect(route.agentId).toBe("sani-core");
     expect(route.matchedBy).toBe("sani.channel");
+  });
+
+  test("sani channel routing sets ACTIVE STATE identity (smoke)", () => {
+    const cfg: OpenClawConfig = {
+      agents: {
+        list: [{ id: "sani-core", default: true }, { id: "sani-work" }, { id: "sani-home" }],
+      },
+    };
+    const cases = [
+      { channel: "telegram", expected: "sani-core" },
+      { channel: "slack", expected: "sani-work" },
+      { channel: "whatsapp", expected: "sani-home" },
+    ];
+
+    for (const entry of cases) {
+      const route = resolveAgentRoute({
+        cfg,
+        channel: entry.channel,
+        accountId: null,
+        peer: { kind: "dm", id: "test" },
+      });
+      expect(route.agentId).toBe(entry.expected);
+      expect(route.matchedBy).toBe("sani.channel");
+
+      const prompt = buildAgentSystemPrompt({
+        workspaceDir: "/tmp/openclaw-smoke",
+        saniEnabled: true,
+        runtimeInfo: { agentId: route.agentId },
+      });
+      expect(prompt).toContain("## ACTIVE STATE");
+      expect(prompt).toContain(`agentId: ${entry.expected}`);
+    }
   });
 
   test("dmScope=per-peer isolates DM sessions by sender id", () => {
