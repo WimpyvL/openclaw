@@ -196,12 +196,39 @@ async function main() {
     "utf-8",
   );
 
+  const disabledVaultSealTool = createVaultSealTool({
+    workspaceDir,
+    config,
+    sessionKey,
+  });
+  assert.ok(disabledVaultSealTool, "vault_seal tool should exist");
+  let disabledError: Error | undefined;
+  try {
+    await disabledVaultSealTool?.execute("tool-call", {
+      source_file: path.relative(workspaceDir, sourceFile),
+      title: "Vault Entry",
+      source_session_id: "spoofed-session",
+      source_trigger: "spoofed-trigger",
+    });
+  } catch (err) {
+    disabledError = err as Error;
+  }
+  assert.equal(
+    disabledError?.message,
+    "Vault sealing is disabled. Enable SANI_VAULT_SEALING_ENABLED to allow.",
+  );
+
+  config.agents.defaults.sani = {
+    ...config.agents.defaults.sani,
+    vaultSealingEnabled: true,
+  };
+
   const vaultSealTool = createVaultSealTool({
     workspaceDir,
     config,
     sessionKey,
   });
-  assert.ok(vaultSealTool, "vault_seal tool should exist");
+  assert.ok(vaultSealTool, "vault_seal tool should exist after enable");
   let rejectedError: Error | undefined;
   try {
     await vaultSealTool?.execute("tool-call", {
