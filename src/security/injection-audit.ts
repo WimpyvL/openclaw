@@ -27,10 +27,20 @@ const INJECTION_PATTERNS: InjectionPattern[] = [
     regex: /```(?:system|prompt|instructions?)\b[\s\S]*?```/i,
   },
   {
+    id: "system_prompt_header",
+    label: "Manual system prompt header",
+    regex: /(?:^|\n)\s{0,3}#{2,6}\s*system\s+prompt\b/im,
+  },
+  {
     id: "system_prompt_override",
     label: "System prompt override attempts",
     regex:
       /\b(system\s+prompt|override\s+system|ignore\s+system|replace\s+system|ignore\s+(?:all|any|previous)\s+instructions|disregard\s+(?:all|any|previous)\s+instructions|you\s+are\s+now|act\s+as)\b/i,
+  },
+  {
+    id: "tool_block_mimicry",
+    label: "Tool block mimicry",
+    regex: /\brun_tool\s*\(\s*name\s*=\s*[^)\s]+/i,
   },
   {
     id: "fake_memory_block",
